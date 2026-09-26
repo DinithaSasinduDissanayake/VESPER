@@ -1,0 +1,9 @@
+# Component B (exploit timing) - Python 3.13
+# Install: python -m venv .venv && .venv\Scripts\pip install -r requirements.txt
+jupyter==1.1.1
+lifelines==0.30.3
+matplotlib==3.11.2
+numpy==2.5.3
+pandas==2.3.3
+requests==2.34.2
+scikit-learn==1.9.1
