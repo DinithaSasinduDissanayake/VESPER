@@ -102,3 +102,18 @@ Key ideas:
 > **Code:** see code cell 6 in `00_survival_practice.ipynb`.
 
 > **Code:** see code cell 7 in `00_survival_practice.ipynb`.
+
+## Why I practised on a toy dataset first
+
+Short answer for the panel:
+
+> Before applying survival analysis to my real CVE data, I validated my understanding of the method and of the `lifelines` library on a small, well-documented benchmark dataset where the expected behaviour is known. This separates tool errors from data errors.
+
+Supporting points:
+
+1. **Separate tool errors from data errors.** Rossi is small (432 rows), clean and widely used in survival-analysis teaching. If a result looks wrong there, the mistake is in my code or my understanding. On raw CVE data I could not tell whether a strange result came from my code or from the data (wrong dates, bad links, extreme censoring).
+2. **Same pipeline, different table.** The steps and library calls are identical to my real component: `KaplanMeierFitter`, `logrank_test`, `CoxPHFitter`. Only the input table changes (duration = days from disclosure to KEV listing, event = listed in KEV or not).
+3. **Learn to interpret the outputs.** I practised reading a survival curve, a log-rank p-value, hazard ratios with confidence intervals and the concordance index, so that I can explain my real results correctly and not overclaim.
+4. **Incremental development.** It follows my iterative plan: verify each building block on a simple case before adding the complexity of three linked data sources.
+
+What it is **not**: the toy dataset is not part of my results. No number from it is reported as a finding of Component B.
