@@ -1,5 +1,7 @@
 # Component B (exploit timing) - Python 3.13
 # Install: python -m venv .venv && .venv\Scripts\pip install -r requirements.txt
+# ipykernel 7.x hangs in older VS Code Jupyter extensions
+ipykernel==6.31.0
 jupyter==1.1.1
 lifelines==0.30.3
 matplotlib==3.11.2
