@@ -1,0 +1,1 @@
+"""Shared VESPER Python package."""
