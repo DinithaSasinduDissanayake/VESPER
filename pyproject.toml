@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Machine-learning-based prioritization of software vulnerabilities for patching"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
-dependencies = []
+dependencies = [
+    "python-dotenv>=1.0,<2",
+]
 
 [dependency-groups]
 dev = [
