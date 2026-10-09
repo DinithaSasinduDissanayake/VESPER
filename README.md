@@ -14,3 +14,7 @@ uv run pytest
 ```
 
 The first command creates or updates the local development environment. The second command runs the test suite.
+
+## Project structure
+
+The project is divided into four components that share one data format, one backend and one frontend. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the components, their owners and the folder layout.
