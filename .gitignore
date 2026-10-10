@@ -9,6 +9,10 @@ __pycache__/
 .env.*
 !.env.example
 
+# Downloaded data and generated results
+data/
+outputs/
+
 # Logs and generated output
 *.log
 dist/
