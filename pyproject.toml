@@ -1,0 +1,26 @@
+[project]
+name = "vesper"
+version = "0.1.0"
+description = "Machine-learning-based prioritization of software vulnerabilities for patching"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "python-dotenv>=1.0,<2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+    "ruff>=0.17.0",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
