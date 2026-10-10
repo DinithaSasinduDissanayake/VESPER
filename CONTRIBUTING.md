@@ -18,19 +18,28 @@ uv run ruff format .
 uv run ruff check .
 ```
 
-## Where your code goes
+## Who owns what
 
-- Your component's code goes in your own folder under `src/vesper/components/`.
-- Your tests go in `tests/`, in a folder that mirrors the source folder. For example, tests for `src/vesper/components/c_graph/` go in `tests/components/c_graph/`.
+| Part | Owner | Folders |
+|---|---|---|
+| Component A | D.S. Dissanayake (IT23373952) | `src/vesper/components/a_text/`, `tests/components/a_text/` |
+| Component B | S.S.H. Thennakoon (IT23232990) | `src/vesper/components/b_survival/`, `tests/components/b_survival/` |
+| Component C | H.T.D. Fernando (IT23177864) | `src/vesper/components/c_graph/`, `tests/components/c_graph/` |
+| Component D | B.L. Beminiwatte (IT23263680) | `src/vesper/components/d_fusion/`, `tests/components/d_fusion/` |
+| Shared parts | The whole team | Everything else |
+
+- Work inside your own folders. A change to anything else is a change to a shared part.
+- A component does not import from another component. Components exchange data only through the shared records.
 - Do not create a second project inside the repository. There is one `pyproject.toml`, one `uv.lock`, one `.env` and one `data/` folder, all at the top level.
+- Do not add new top-level folders. Code that you run from the command line is a module inside your component, not a loose script.
 
-## Shared folders
+## Shared parts
 
-`src/vesper/contracts/`, `src/vesper/data/`, `src/vesper/eval/`, `src/vesper/api/`, `src/vesper/config.py` and `frontend/` belong to the whole team.
+`src/vesper/contracts/`, `src/vesper/data/`, `src/vesper/eval/`, `src/vesper/api/`, `src/vesper/config.py`, `frontend/`, `pyproject.toml` and the documents at the top level belong to the whole team.
 
+- Change a shared part on its own `shared/...` branch, in a small pull request, and tell the team. Do not mix it with component work.
 - Use the shared records in `contracts/` to pass data between components. Do not define your own version of a vulnerability or a score.
-- If a shared record is missing something you need, change it in a separate pull request and tell the team. Do not mix that change with component work.
-- Read paths and keys from `vesper.config`. Do not hard-code paths.
+- Take paths and keys from `vesper.config`. Do not build a path yourself, and do not hard-code one.
 
 ## Branches
 
@@ -62,7 +71,7 @@ Examples: `feat(contracts): add score record`, `fix(c_graph): handle a CVE with 
 ## Pull requests
 
 - Open a pull request from your branch into `master`.
-- Say what changed, why, and how you tested it.
+- Say what changed, why, and how you tested it. Include the command you ran and its output.
 - All tests must pass.
 - One other team member reads and approves it before it is merged.
 - Merge with a merge commit. Do not squash, so that every member's commits stay in the history.
@@ -76,10 +85,13 @@ Examples: `feat(contracts): add score record`, `fix(c_graph): handle a CVE with 
 
 - Add a package with `uv add <package>`, in the same commit as the first code that uses it. Commit `pyproject.toml` and `uv.lock` together.
 - Do not use `pip install` or a `requirements.txt` file.
+- Keep a pull request that adds a package small and merge it soon, because everyone shares `pyproject.toml` and `uv.lock`.
+- If `uv.lock` or `bun.lock` has a merge conflict, do not edit it by hand. Take the version from `master` and run `uv lock` or `bun install` again.
 
 ## Data and secrets
 
-- Data files are not stored in this repository. They go in `data/`, which git ignores.
+- Data files are not stored in this repository. They go in `data/`, which git ignores. Each source has its own folder under `data/raw/`; get it from `load_settings().raw_source("nvd")`.
+- Generated files are not stored either: no trained models, result tables, figures or PDFs. They go in `outputs/`, which git ignores, and a command in the repository must be able to produce them again.
 - Keys go in `.env`, which git ignores. `.env.example` lists the names without the values.
 - This repository is public. Never commit a key, a password or personal data.
 
@@ -90,3 +102,4 @@ VESPER predicts future exploitation, so a model must only see what was known at 
 - Features come from the vulnerability record. Outcomes, such as the date a CVE was added to KEV, are kept in separate records and are never used as features.
 - Train only on data from before the test period.
 - Do not call a score a probability until it has been validated.
+- Report only results that the shared code in `vesper.eval` produced, so that every component is measured the same way.
