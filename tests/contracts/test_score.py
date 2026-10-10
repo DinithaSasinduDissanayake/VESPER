@@ -17,6 +17,7 @@ def make_score() -> Score:
         status=ScoreStatus.AVAILABLE,
         reason=None,
         model_version="a_text-0.1",
+        trained_through=datetime(2021, 10, 1, tzinfo=UTC),
         snapshot_date=date(2026, 10, 1),
     )
 
@@ -55,6 +56,22 @@ def test_invalid_cve_identifier_is_rejected():
 def test_decision_time_without_a_time_zone_is_rejected():
     with pytest.raises(ValueError, match="time zone"):
         replace(make_score(), decision_time=datetime(2021, 12, 10, 10, 15))
+
+
+def test_score_that_needs_no_training_has_no_training_cut_off():
+    score = replace(make_score(), trained_through=None)
+
+    assert score.trained_through is None
+
+
+def test_training_cut_off_without_a_time_zone_is_rejected():
+    with pytest.raises(ValueError, match="time zone"):
+        replace(make_score(), trained_through=datetime(2021, 10, 1))
+
+
+def test_model_trained_after_the_decision_time_is_rejected():
+    with pytest.raises(ValueError, match="after decision_time"):
+        replace(make_score(), trained_through=datetime(2022, 1, 1, tzinfo=UTC))
 
 
 @pytest.mark.parametrize("horizon_days", [0, -30])
