@@ -5,21 +5,22 @@ KEV is the official list of CVEs confirmed as exploited in the wild.
 In Component B it provides the "event" date: the `dateAdded` field.
 
 Run from anywhere:
-    python component_b/src/download_kev.py
+    uv run python -m vesper.components.b_survival.download_kev
 """
 
 import json
 import sys
 from datetime import date
-from pathlib import Path
 
 import requests
+
+from vesper.config import load_settings
 
 # Official KEV catalogue feed published by CISA
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 
-# component_b/data/raw/  (built from this file's location, so it works from any folder)
-RAW_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
+# data/raw/kev/ in the project (path comes from vesper.config)
+RAW_DIR = load_settings().raw_source("kev")
 
 
 def download_kev():

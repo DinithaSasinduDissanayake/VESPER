@@ -6,25 +6,24 @@ score and vector. In Component B the published date is the start of the
 survival clock and the CVSS metrics are the main covariates.
 
 The download is split into one file per month of publication:
-    component_b/data/raw/nvd/nvd_2015-01.json.gz, nvd_2015-02.json.gz, ...
+    data/raw/nvd/nvd_2015-01.json.gz, nvd_2015-02.json.gz, ...
 If the script stops halfway, run it again: months already saved are skipped.
 
-Run from anywhere:
-    python component_b/src/download_nvd.py            # everything from START_YEAR
-    python component_b/src/download_nvd.py 2015-01    # one month only (for testing)
+Run from anywhere (everything from START_YEAR, or one month only for testing):
+    uv run python -m vesper.components.b_survival.download_nvd
+    uv run python -m vesper.components.b_survival.download_nvd 2015-01
 """
 
 import calendar
 import gzip
 import json
-import os
 import sys
 import time
-from datetime import date, datetime, timezone
-from pathlib import Path
+from datetime import UTC, date, datetime
 
 import requests
-from dotenv import load_dotenv
+
+from vesper.config import load_settings
 
 # ---------------------------------------------------------------------------
 # Settings
@@ -40,25 +39,25 @@ RESULTS_PER_PAGE = 2000
 
 # NVD rate limits (per rolling 30 seconds): 5 requests without a key, 50 with a key.
 # We pause between requests so we always stay well below the limit.
-PAUSE_WITH_KEY = 2       # seconds
-PAUSE_WITHOUT_KEY = 7    # seconds
+PAUSE_WITH_KEY = 2  # seconds
+PAUSE_WITHOUT_KEY = 7  # seconds
 
 # If a request fails, try again this many times, waiting longer each time
 MAX_RETRIES = 5
 
-# Folders, built from this file's location so the script works from any folder
-COMPONENT_DIR = Path(__file__).resolve().parent.parent      # component_b/
-NVD_DIR = COMPONENT_DIR / "data" / "raw" / "nvd"
+# Folder and API key come from vesper.config (key is read from the top-level .env,
+# never written in this script, never printed)
+SETTINGS = load_settings()
+NVD_DIR = SETTINGS.raw_source("nvd")
+API_KEY = SETTINGS.nvd_api_key
 
-# Read the API key from component_b/.env (never written in this script, never printed)
-load_dotenv(COMPONENT_DIR / ".env")
-API_KEY = os.getenv("NVD_API_KEY")
 PAUSE = PAUSE_WITH_KEY if API_KEY else PAUSE_WITHOUT_KEY
 
 
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
+
 
 def list_months(start_year):
     """Return every (year, month) from January of start_year up to the current month."""
@@ -73,13 +72,13 @@ def list_months(start_year):
 
 def fetch_page(year, month, start_index):
     """Ask the API for one page of CVEs published in the given month."""
-    last_day = calendar.monthrange(year, month)[1]   # 28, 29, 30 or 31
+    last_day = calendar.monthrange(year, month)[1]  # 28, 29, 30 or 31
     params = {
         # Publication-date window (UTC). The API allows at most 120 days; one month is safe.
         "pubStartDate": f"{year}-{month:02d}-01T00:00:00.000Z",
         "pubEndDate": f"{year}-{month:02d}-{last_day}T23:59:59.999Z",
         "resultsPerPage": RESULTS_PER_PAGE,
-        "startIndex": start_index,                   # where this page starts (0, 2000, 4000, ...)
+        "startIndex": start_index,  # where this page starts (0, 2000, 4000, ...)
     }
     # The key is sent as a request header, as the NVD documentation requires
     headers = {"apiKey": API_KEY} if API_KEY else {}
@@ -87,7 +86,7 @@ def fetch_page(year, month, start_index):
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = requests.get(NVD_API_URL, params=params, headers=headers, timeout=120)
-            response.raise_for_status()              # HTTP errors (403, 503, ...) -> exception
+            response.raise_for_status()  # HTTP errors (403, 503, ...) -> exception
             return response.json()
         except (requests.exceptions.RequestException, ValueError) as error:
             # Covers: no internet, timeout, rate limit hit, server busy, invalid JSON
@@ -108,12 +107,12 @@ def download_month(year, month):
 
     while True:
         page = fetch_page(year, month, start_index)
-        cves.extend(page["vulnerabilities"])         # one record per CVE
-        total = page["totalResults"]                 # how many CVEs NVD has for this month
-        time.sleep(PAUSE)                            # respect the rate limit
+        cves.extend(page["vulnerabilities"])  # one record per CVE
+        total = page["totalResults"]  # how many CVEs NVD has for this month
+        time.sleep(PAUSE)  # respect the rate limit
 
         start_index += RESULTS_PER_PAGE
-        if start_index >= total:                     # no more pages
+        if start_index >= total:  # no more pages
             break
 
     # Safety check: we must have received exactly what NVD said exists
@@ -123,9 +122,9 @@ def download_month(year, month):
 
     content = {
         "month": f"{year}-{month:02d}",
-        "downloaded_at": datetime.now(timezone.utc).isoformat(),   # when this snapshot was taken
+        "downloaded_at": datetime.now(UTC).isoformat(),  # when this snapshot was taken
         "totalResults": total,
-        "vulnerabilities": cves,                     # records exactly as NVD returned them
+        "vulnerabilities": cves,  # records exactly as NVD returned them
     }
 
     # Write to a temporary file first and rename it at the end, so a file that
@@ -152,6 +151,7 @@ def count_saved_cves():
 # ---------------------------------------------------------------------------
 # Main program
 # ---------------------------------------------------------------------------
+
 
 def main():
     NVD_DIR.mkdir(parents=True, exist_ok=True)
