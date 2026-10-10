@@ -1,0 +1,11 @@
+# Store text files with LF line endings on every operating system
+* text=auto eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+*.docx binary
+*.parquet binary
+*.woff2 binary
