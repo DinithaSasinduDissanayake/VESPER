@@ -6,11 +6,8 @@ contained. Every number below was counted from the files in
 Git (see `.gitignore`); use "How to rebuild" to download them again.
 
 All times are Sri Lanka time (UTC+05:30). Download times are the times the
-files were written to disk.
-
-> **Status: INCOMPLETE.** The full NVD download has not been run yet. Only the
-> one-month test slice (January 2015) is on disk. The NVD section must be
-> updated after the full download.
+files were written to disk. For NVD they come from the `downloaded_at` field
+stored inside each monthly file.
 
 ## Snapshot date (censoring date)
 
@@ -22,9 +19,10 @@ source of the event, so its download date defines the snapshot. The catalogue
 itself was released by CISA on 2026-09-30 (`dateReleased`), and its latest
 `dateAdded` is 2026-09-30.
 
-ExploitDB and NVD were downloaded one day later (2026-10-02). Any record in
-those files dated after the snapshot date must be filtered out when the
-survival table is built.
+ExploitDB was downloaded one day later (2026-10-02). NVD was downloaded on
+2026-10-02 (one month) and 2026-10-06 (all other months). Any record in those
+files dated after the snapshot date must be filtered out when the survival
+table is built.
 
 ## 1. CISA KEV (Known Exploited Vulnerabilities)
 
@@ -50,19 +48,32 @@ even for CVEs exploited years before.
 | Records | 47,170 rows (one row per exploit entry, not per CVE) |
 | Date range (`date_published`) | 1988-08-01 to 2026-10-01 (no missing dates) |
 
-## 3. NVD (National Vulnerability Database) — test slice only
+## 3. NVD (National Vulnerability Database)
 
 | Item | Value |
 |---|---|
-| Downloaded | 2026-10-02 15:26:07 (+05:30) |
+| Downloaded | `nvd_2015-01.json.gz`: 2026-10-02 15:26:07 (+05:30). The other 141 files: 2026-10-06, from 15:10:40 to 16:55:10 (+05:30) |
 | Source URL | https://services.nvd.nist.gov/rest/json/cves/2.0 (API 2.0, filtered by publication date) |
-| Raw files | `data/raw/nvd/nvd_YYYY-MM.json.gz`, one per publication month. On disk now: 1 file, `nvd_2015-01.json.gz` (303,829 bytes) |
-| Records | 737 CVEs (737 unique CVE IDs; equals NVD's `totalResults` for the month) |
-| Date range (`published`) | 2015-01-01T02:59:01 to 2015-01-30T11:59:50 |
+| Raw files | `data/raw/nvd/nvd_YYYY-MM.json.gz`, one per publication month: 142 files, 2015-01 to 2026-10, no month missing (166,241,258 bytes in total) |
+| Records | 334,192 CVEs (334,192 unique CVE IDs; no CVE appears in two files) |
+| Check against NVD | In all 142 files the number of records equals NVD's `totalResults` for the month |
+| Date range (`published`) | 2015-01-01T02:59:01.533 to 2026-10-06T11:17:30.020 (UTC, no missing dates) |
+| Published after the snapshot date | 1,412 CVEs (published 2026-10-02 to 2026-10-06) |
 
-Planned coverage: CVEs published from `START_YEAR` (currently 2015, set at the
-top of `download_nvd.py`) to the download date. Each monthly file stores its own
-download time in the field `downloaded_at`.
+Coverage: CVEs published from `START_YEAR` (2015, set at the top of
+`download_nvd.py`) to the download date. Each monthly file stores its own
+download time in the field `downloaded_at` (UTC).
+
+Two things to handle when the survival table is built:
+
+- **CVEs published after the snapshot.** The October 2026 file was downloaded on
+  2026-10-06, so it holds 1,809 CVEs: 397 published on 2026-10-01 and 1,412
+  published after it. The 1,412 must be left out.
+- **Records changed after the snapshot.** NVD returns each record as it was on
+  the download day, not on the snapshot date. 3,358 records have a
+  `lastModified` date after 2026-10-01; 1,946 of them were published on or
+  before the snapshot date. For those, values such as the CVSS score may have
+  been added or changed after the snapshot.
 
 ## How to rebuild
 
