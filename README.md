@@ -18,3 +18,7 @@ The first command creates or updates the local development environment. The seco
 ## Project structure
 
 The project is divided into four components that share one data format, one backend and one frontend. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the components, their owners and the folder layout.
+
+## Contributing
+
+The working rules for branches, commits, pull requests, tests and data are in [CONTRIBUTING.md](CONTRIBUTING.md).
