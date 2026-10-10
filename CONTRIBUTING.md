@@ -11,6 +11,13 @@ uv run pytest
 
 All tests must pass on a fresh clone before you change anything. If they do not, tell the team before going further.
 
+Before you commit, format and check the Python code:
+
+```bash
+uv run ruff format .
+uv run ruff check .
+```
+
 ## Where your code goes
 
 - Your component's code goes in your own folder under `src/vesper/components/`.

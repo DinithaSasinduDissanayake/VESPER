@@ -1,14 +1,14 @@
 """Shared description of one score given to one vulnerability by one component."""
 
+import math
 from dataclasses import dataclass
 from datetime import date, datetime
-from enum import Enum
-import math
+from enum import StrEnum
 
 from vesper.contracts.vulnerability import CVE_ID_PATTERN
 
 
-class Component(str, Enum):
+class Component(StrEnum):
     """The four VESPER components."""
 
     A_TEXT = "a_text"
@@ -17,7 +17,7 @@ class Component(str, Enum):
     D_FUSION = "d_fusion"
 
 
-class ScoreKind(str, Enum):
+class ScoreKind(StrEnum):
     """What kind of number the score is."""
 
     RANKING_SCORE = "ranking_score"
@@ -25,7 +25,7 @@ class ScoreKind(str, Enum):
     VALIDATED_PROBABILITY = "validated_probability"
 
 
-class ScoreStatus(str, Enum):
+class ScoreStatus(StrEnum):
     """Whether the component produced a score, and if not, why."""
 
     AVAILABLE = "available"

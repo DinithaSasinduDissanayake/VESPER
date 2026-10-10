@@ -1,5 +1,5 @@
 from dataclasses import FrozenInstanceError, replace
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -10,7 +10,7 @@ def make_score() -> Score:
     return Score(
         cve_id="CVE-2021-44228",
         component=Component.A_TEXT,
-        decision_time=datetime(2021, 12, 10, 10, 15, tzinfo=timezone.utc),
+        decision_time=datetime(2021, 12, 10, 10, 15, tzinfo=UTC),
         horizon_days=90,
         score=0.87,
         score_kind=ScoreKind.RANKING_SCORE,
