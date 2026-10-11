@@ -18,6 +18,8 @@ where that record has the field:
     cvss_version              "3.1" or "3.0" (empty if missing)
     cvss_vector               the full CVSS vector text (empty if missing)
     cvss_missing              True if the CVE has no CVSS 3.1 or 3.0 score
+    cvss_is_primary           True if the score used is NVD's own ("Primary"),
+                              False if it is from another source (empty if missing)
     cvss_attack_vector        NETWORK, ADJACENT_NETWORK, LOCAL or PHYSICAL
     cvss_attack_complexity    LOW or HIGH
     cvss_privileges_required  NONE, LOW or HIGH
@@ -44,7 +46,7 @@ import json
 
 import pandas as pd
 
-from vesper.components.b_survival.snapshot import PROCESSED_SUBFOLDER, SNAPSHOT_DATE
+from vesper.components.b_survival.study_design import PROCESSED_SUBFOLDER, SNAPSHOT_DATE
 from vesper.config import load_settings
 from vesper.contracts.vulnerability import CVE_ID_PATTERN
 
@@ -78,6 +80,7 @@ OUTPUT_COLUMNS = [
     "cvss_version",
     "cvss_vector",
     "cvss_missing",
+    "cvss_is_primary",
     *VECTOR_COLUMNS,
     "cwe_ids",
     "after_snapshot",
@@ -88,8 +91,8 @@ OUTPUT_COLUMNS = [
 # Columns that are worked out during cleaning, not taken from the record
 ADDED_COLUMNS = ["after_snapshot", "modified_after_snapshot", "snapshot_date"]
 
-# Columns used only to count things for the report; they are not saved
-HELPER_COLUMNS = ["cvss_type", "has_other_cvss"]
+# Column used only to count things for the report; it is not saved
+HELPER_COLUMNS = ["has_other_cvss"]
 
 # How dates are written in the CSV: ISO 8601 with "Z", which means UTC
 CSV_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -162,9 +165,10 @@ def extract_row(cve):
         "cvss_version": cvss_data.get("version"),
         "cvss_vector": vector,
         "cvss_missing": cvss is None,
+        # Who gave the score used: NVD itself ("Primary") or another source
+        "cvss_is_primary": cvss.get("type") == "Primary" if cvss else None,
         **parse_vector(vector),
         "cwe_ids": collect_cwe_ids(cve.get("weaknesses")),
-        "cvss_type": cvss.get("type") if cvss else None,
         "has_other_cvss": bool(other_keys),
     }
 
@@ -183,6 +187,8 @@ def clean_nvd(records, snapshot_date=SNAPSHOT_DATE):
     table = pd.DataFrame(rows, columns=extracted + HELPER_COLUMNS)
     table["cvss_missing"] = table["cvss_missing"].astype(bool)
     table["has_other_cvss"] = table["has_other_cvss"].astype(bool)
+    # "boolean" is a true/false column that can also be empty (no CVSS score)
+    table["cvss_is_primary"] = table["cvss_is_primary"].astype("boolean")
     report = {"rows_before": len(table)}
 
     # --- 2. Check every CVE ID against the shared pattern --------------------
@@ -230,12 +236,19 @@ def clean_nvd(records, snapshot_date=SNAPSHOT_DATE):
     report["status_counts"] = table["nvd_status"].value_counts().to_dict()
     report["cvss_version_3_1"] = int((table["cvss_version"] == "3.1").sum())
     report["cvss_version_3_0"] = int((table["cvss_version"] == "3.0").sum())
-    report["cvss_primary"] = int((table["cvss_type"] == "Primary").sum())
-    report["cvss_not_primary"] = int((~table["cvss_missing"]).sum()) - report["cvss_primary"]
+    # An empty cvss_is_primary (no CVSS score) is counted in neither line
+    report["cvss_primary"] = int(table["cvss_is_primary"].eq(True).sum())
+    report["cvss_not_primary"] = int(table["cvss_is_primary"].eq(False).sum())
     report["cvss_missing"] = int(table["cvss_missing"].sum())
     report["cvss_missing_with_other_version"] = int(
         (table["cvss_missing"] & table["has_other_cvss"]).sum()
     )
+
+    # Per publication year: how many CVEs, and how many of them have no CVSS score
+    by_year = table.groupby(table["published_at"].dt.year)["cvss_missing"].agg(["size", "sum"])
+    report["cvss_missing_by_year"] = {
+        int(year): (int(row["size"]), int(row["sum"])) for year, row in by_year.iterrows()
+    }
 
     table = table[OUTPUT_COLUMNS]
     # An empty cell is a missing value: no CVSS score, or no CWE
@@ -257,10 +270,13 @@ def print_report(report):
     print("  CVSS score used")
     print("    version 3.1:", report["cvss_version_3_1"])
     print("    version 3.0:", report["cvss_version_3_0"])
-    print("    from a Primary entry:", report["cvss_primary"])
-    print("    from another entry (no Primary one):", report["cvss_not_primary"])
-    print("    missing (no 3.1 or 3.0 score):", report["cvss_missing"])
+    print("    cvss_is_primary True (NVD's own score):", report["cvss_primary"])
+    print("    cvss_is_primary False (another source):", report["cvss_not_primary"])
+    print("    cvss_is_primary empty (no 3.1 or 3.0 score):", report["cvss_missing"])
     print("      of these, with a 2.0 or 4.0 score:", report["cvss_missing_with_other_version"])
+    print("  CVSS missing by publication year (CVEs, missing, percent)")
+    for year, (cves, missing) in report["cvss_missing_by_year"].items():
+        print(f"    {year}: {cves}, {missing}, {100 * missing / cves:.1f}%")
     print("  Status of the rows kept")
     for status, count in report["status_counts"].items():
         print(f"    {status}: {count}")

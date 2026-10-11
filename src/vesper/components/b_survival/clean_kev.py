@@ -23,7 +23,7 @@ from datetime import date
 
 import pandas as pd
 
-from vesper.components.b_survival.snapshot import PROCESSED_SUBFOLDER, SNAPSHOT_DATE
+from vesper.components.b_survival.study_design import PROCESSED_SUBFOLDER, SNAPSHOT_DATE
 from vesper.config import load_settings
 from vesper.contracts.vulnerability import CVE_ID_PATTERN
 

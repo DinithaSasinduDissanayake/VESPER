@@ -175,6 +175,7 @@ def test_one_row_per_cve_with_the_expected_columns():
         "cvss_version",
         "cvss_vector",
         "cvss_missing",
+        "cvss_is_primary",
         "cvss_attack_vector",
         "cvss_attack_complexity",
         "cvss_privileges_required",
@@ -191,6 +192,7 @@ def test_one_row_per_cve_with_the_expected_columns():
     assert row["cvss_version"] == "3.1"
     assert row["cvss_vector"] == VECTOR_31
     assert not row["cvss_missing"]
+    assert row["cvss_is_primary"]
     assert row["cvss_attack_vector"] == "NETWORK"
     assert row["cwe_ids"] == "CWE-79"
     assert row["snapshot_date"] == "2026-10-01"
@@ -236,6 +238,41 @@ def test_report_counts_the_cvss_version_and_entry_type_used():
     assert report["cvss_version_3_0"] == 1
     assert report["cvss_primary"] == 1
     assert report["cvss_not_primary"] == 1
+
+
+def test_cvss_is_primary_is_true_false_or_empty():
+    records = [
+        nvd_record("CVE-2024-1111", metrics={"cvssMetricV31": [cvss_entry("3.1", 5.4)]}),
+        nvd_record(
+            "CVE-2024-2222", metrics={"cvssMetricV31": [cvss_entry("3.1", 7.0, "Secondary")]}
+        ),
+        nvd_record("CVE-2024-3333"),  # no CVSS score
+    ]
+
+    table, report = clean_nvd(records, SNAPSHOT)
+
+    by_cve = table.set_index("cve_id")["cvss_is_primary"]
+    assert by_cve.tolist() == [True, False, pd.NA]
+    assert pd.isna(by_cve["CVE-2024-3333"])
+    # The three groups together are every row
+    assert report["cvss_primary"] == 1
+    assert report["cvss_not_primary"] == 1
+    assert report["cvss_missing"] == 1
+    assert report["missing_values"]["cvss_is_primary"] == 1
+
+
+def test_report_counts_missing_cvss_per_publication_year():
+    cvss = {"cvssMetricV31": [cvss_entry("3.1", 5.4)]}
+    records = [
+        nvd_record("CVE-2015-1111", published="2015-03-01T00:00:00.000"),
+        nvd_record("CVE-2015-2222", published="2015-04-01T00:00:00.000", metrics=cvss),
+        nvd_record("CVE-2016-1111", published="2016-01-01T00:00:00.000", metrics=cvss),
+    ]
+
+    _, report = clean_nvd(records, SNAPSHOT)
+
+    # year: (CVEs, CVEs with no CVSS score)
+    assert report["cvss_missing_by_year"] == {2015: (2, 1), 2016: (1, 0)}
 
 
 def test_rejected_cves_are_dropped_and_counted():
@@ -385,5 +422,7 @@ def test_main_reads_every_monthly_file_and_writes_the_csv(tmp_path):
     assert saved.loc[0, "cvss_version"] == "3.0"
     assert saved.loc[0, "cvss_missing"] == "False"
     assert saved.loc[1, "cvss_missing"] == "True"
+    assert saved.loc[0, "cvss_is_primary"] == "True"
+    assert saved.loc[1, "cvss_is_primary"] == ""
     assert saved.loc[1, "cvss_base_score"] == ""
     assert saved.loc[1, "cwe_ids"] == ""
