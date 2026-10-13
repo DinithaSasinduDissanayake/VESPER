@@ -76,3 +76,145 @@ def test_ignores_events_after_snapshot():
     assert result.cwe_ids == ()
     assert result.affected == ()
     assert result.evidence_events == 0
+    
+
+def test_marks_history_as_incomplete_by_default():
+    result = reconstruct_relationships(
+        "CVE-2024-21732",
+        {"cveChanges": []},
+        date(2024, 2, 1),
+    )
+
+    assert result.history_complete is False
+    assert result.limitations
+    assert any(
+        "completeness" in limitation.lower()
+        for limitation in result.limitations
+    )
+    
+def test_later_duplicate_cwe_does_not_change_historical_snapshot():
+    history = {
+        "cveChanges": [
+            {
+                "change": {
+                    "created": "2024-01-08T18:51:23.750",
+                    "details": [
+                        {
+                            "action": "Added",
+                            "type": "CWE",
+                            "newValue": "NIST CWE-79",
+                        }
+                    ],
+                }
+            },
+            {
+                "change": {
+                    "created": "2025-06-03T15:15:56.083",
+                    "details": [
+                        {
+                            "action": "Added",
+                            "type": "CWE",
+                            "newValue": "CWE-79",
+                        }
+                    ],
+                }
+            },
+        ]
+    }
+
+    result = reconstruct_relationships(
+        "CVE-2024-21732",
+        history,
+        date(2024, 2, 1),
+    )
+
+    assert result.cwe_ids == ("CWE-79",)
+    assert result.evidence_events == 1
+
+
+def test_relationship_removed_before_snapshot_is_not_included():
+    history = {
+        "cveChanges": [
+            {
+                "change": {
+                    "created": "2024-01-08T10:00:00.000",
+                    "details": [
+                        {
+                            "action": "Added",
+                            "type": "CWE",
+                            "newValue": "CWE-79",
+                        }
+                    ],
+                }
+            },
+            {
+                "change": {
+                    "created": "2024-01-20T10:00:00.000",
+                    "details": [
+                        {
+                            "action": "Removed",
+                            "type": "CWE",
+                            "oldValue": "CWE-79",
+                        }
+                    ],
+                }
+            },
+        ]
+    }
+
+    result = reconstruct_relationships(
+        "CVE-2024-21732",
+        history,
+        date(2024, 2, 1),
+    )
+
+    assert result.cwe_ids == ()
+    
+def test_cpe_configuration_change_replaces_old_relationship():
+    history = {
+        "cveChanges": [
+            {
+                "change": {
+                    "created": "2024-01-08T10:00:00.000",
+                    "details": [
+                        {
+                            "action": "Added",
+                            "type": "CPE Configuration",
+                            "newValue": (
+                                "cpe:2.3:a:old_vendor:old_product:"
+                                "*:*:*:*:*:*:*:*"
+                            ),
+                        }
+                    ],
+                }
+            },
+            {
+                "change": {
+                    "created": "2024-01-20T10:00:00.000",
+                    "details": [
+                        {
+                            "action": "Changed",
+                            "type": "CPE Configuration",
+                            "oldValue": (
+                                "cpe:2.3:a:old_vendor:old_product:"
+                                "*:*:*:*:*:*:*:*"
+                            ),
+                            "newValue": (
+                                "cpe:2.3:a:new_vendor:new_product:"
+                                "*:*:*:*:*:*:*:*"
+                            ),
+                        }
+                    ],
+                }
+            },
+        ]
+    }
+
+    result = reconstruct_relationships(
+        "CVE-2024-21732",
+        history,
+        date(2024, 2, 1),
+    )
+
+    assert result.affected == (("new_vendor", "new_product"),)
+
