@@ -7,6 +7,10 @@ from typing import Any
 from vesper.contracts.vulnerability import Vulnerability
 
 
+class SnapshotDateError(ValueError):
+    """Raised when an NVD record was modified after the requested snapshot."""
+
+
 def _parse_timestamp(value: str) -> datetime:
     """Parse an ISO 8601 timestamp and ensure it is timezone-aware."""
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -110,7 +114,7 @@ def parse_nvd_record(
     last_modified_at = _parse_timestamp(cve["lastModified"])
 
     if last_modified_at.date() > snapshot_date:
-        raise ValueError(
+        raise SnapshotDateError(
             f"{cve['id']} was modified after snapshot date "
             f"{snapshot_date}; historical state cannot be guaranteed"
         )
