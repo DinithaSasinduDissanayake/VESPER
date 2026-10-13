@@ -94,4 +94,12 @@ def test_parse_nvd_record_handles_missing_optional_fields():
     assert vulnerability.cvss_version is None
     assert vulnerability.cvss_vector is None
     assert vulnerability.cwe_ids == ()
-    assert vulnerability.affected == ()
+    assert vulnerability.affected == ()      
+    
+def test_parse_nvd_record_rejects_record_modified_after_snapshot():
+    import pytest
+
+    record = make_nvd_record()
+
+    with pytest.raises(ValueError, match="modified after snapshot date"):
+        parse_nvd_record(record, date(2022, 1, 1))

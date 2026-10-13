@@ -72,7 +72,9 @@ def _extract_cwes(cve: dict[str, Any]) -> tuple[str, ...]:
     return tuple(sorted(cwe_ids))
 
 
-def _extract_cvss(cve: dict[str, Any]) -> tuple[float | None, str | None, str | None]:
+def _extract_cvss(
+    cve: dict[str, Any],
+) -> tuple[float | None, str | None, str | None]:
     """Extract the first available CVSS base score, version, and vector."""
     for metric_name in (
         "cvssMetricV40",
@@ -97,8 +99,22 @@ def _extract_cvss(cve: dict[str, Any]) -> tuple[float | None, str | None, str | 
 def parse_nvd_record(
     record: dict[str, Any], snapshot_date: date
 ) -> Vulnerability:
-    """Convert one NVD API vulnerability wrapper into a VESPER contract."""
+    """Convert one NVD API vulnerability wrapper into a VESPER contract.
+
+    Reject records whose last-modified date is later than the requested
+    snapshot date. This is a conservative safeguard; it does not reconstruct
+    historical field values for records modified on or before the cutoff.
+    """
     cve = record["cve"]
+
+    last_modified_at = _parse_timestamp(cve["lastModified"])
+
+    if last_modified_at.date() > snapshot_date:
+        raise ValueError(
+            f"{cve['id']} was modified after snapshot date "
+            f"{snapshot_date}; historical state cannot be guaranteed"
+        )
+
     descriptions = cve.get("descriptions", [])
     description = next(
         (
@@ -108,12 +124,13 @@ def parse_nvd_record(
         ),
         "",
     )
+
     cvss_score, cvss_version, cvss_vector = _extract_cvss(cve)
 
     return Vulnerability(
         cve_id=cve["id"],
         published_at=_parse_timestamp(cve["published"]),
-        last_modified_at=_parse_timestamp(cve["lastModified"]),
+        last_modified_at=last_modified_at,
         description=description,
         cvss_base_score=cvss_score,
         cvss_version=cvss_version,
