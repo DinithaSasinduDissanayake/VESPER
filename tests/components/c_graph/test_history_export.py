@@ -1,4 +1,8 @@
+import gzip
+import json
+import pytest
 
+from vesper.components.c_graph.export_features import export_features
 """Tests for integrating reconstructed relationships into graph scoring."""
 
 from datetime import date, datetime, timezone
@@ -69,3 +73,34 @@ def test_reconstructed_relationships_can_be_scored():
     assert ("cwe", "CWE-79") in graph.nodes
     assert len(features) == 1
     assert features.iloc[0]["cve_id"] == "CVE-2024-21732"
+
+def test_export_does_not_overwrite_existing_output_on_rejection(tmp_path):
+    input_path = tmp_path / "nvd.json.gz"
+    output_path = tmp_path / "features.csv"
+
+    # An existing output must remain untouched if export is rejected.
+    output_path.write_text("existing output\n", encoding="utf-8")
+
+    data = {
+        "vulnerabilities": [
+            {
+                "cve": {
+                    "id": "CVE-2024-21732",
+                    "published": "2024-01-01T08:15:36.087Z",
+                    "lastModified": "2026-06-17T07:10:02.103Z",
+                    "descriptions": [],
+                    "metrics": {},
+                    "weaknesses": [],
+                    "configurations": [],
+                }
+            }
+        ]
+    }
+
+    with gzip.open(input_path, "wt", encoding="utf-8") as file:
+        json.dump(data, file)
+
+    with pytest.raises(ValueError, match="Export stopped"):
+        export_features(input_path, output_path, date(2024, 2, 1))
+
+    assert output_path.read_text(encoding="utf-8") == "existing output\n"
