@@ -5,14 +5,10 @@ description = "Machine-learning-based prioritization of software vulnerabilities
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
-<<<<<<< HEAD
-    "pandas>=3.0.6",
-=======
     "lifelines>=0.30.3",
     "matplotlib>=3.11.2",
     "networkx>=3.6.1",
     "pandas>=2.3.3",
->>>>>>> 5f0fff85004596a924264bc78b5224981f75fd48
     "pyarrow>=26.0.0",
     "python-dotenv>=1.0,<2",
     "requests>=2.34.2",
