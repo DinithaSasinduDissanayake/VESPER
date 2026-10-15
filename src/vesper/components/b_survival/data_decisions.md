@@ -220,6 +220,72 @@ code. Other sources exist but are not part of the study yet.
 
 **Why.** Keeping outcome and inputs apart is the main protection against
 leakage, and it is one of the rules of the project (CONTRIBUTING.md).
+## 12. Chronological split
+
+**What I found.** A model must be judged on CVEs that come after the ones it
+learned from, and the training data must not know anything from after the
+cut-off. The survival table, however, was built at the snapshot date, so on its
+own it knows how every CVE ended up.
+
+**The numbers.** The cut-off dates are 2022-01-01, 2022-07-01, 2023-01-01 and
+2024-01-01. They are proposed and wait for team agreement (`CUTOFF_DATES` in
+`study_design.py`). Printed by `split_data`:
+
+| Cut-off | Train rows | Train events | Test rows | Test events |
+|---|---|---|---|---|
+| 2022-01-01 | 93,374 | 300 (0.32%) | 25,041 | 99 (0.40%) |
+| 2022-07-01 | 105,725 | 610 (0.58%) | 26,790 | 104 (0.39%) |
+| 2023-01-01 | 118,415 | 666 (0.56%) | 28,803 | 152 (0.53%) |
+| 2024-01-01 | 147,218 | 836 (0.57%) | 39,843 | 153 (0.38%) |
+
+**What I decided.**
+
+- Train is every CVE published before the cut-off. Test is every CVE published
+  from the cut-off for 365 days (`MATURITY_DAYS`).
+- The cut-off is the start of the cut-off day (00:00 UTC). A KEV listing or an
+  exploit dated on the cut-off day itself is therefore treated as not known.
+- The train set is re-censored at the cut-off. An event that happened on or
+  after the cut-off becomes event = 0 with duration = cut-off minus publication
+  day. This turns 404, 157, 137 and 119 train events into censored rows for the
+  four cut-offs. A row that was censored at the snapshot is also cut back to
+  the cut-off.
+- In the train set, an exploit date on or after the cut-off is removed (68,
+  69, 107 and 78 rows), and `kev_launch_group` is cleared when its event was
+  re-censored.
+- The test set keeps its follow-up up to the snapshot date, unchanged.
+- CVEs with `already_exploited` = True are removed from both sets (negative
+  durations), and `kev_launch_group` stays as a column. 32, 28, 13 and 7 CVEs
+  leave the test sets this way.
+- Nine leakage checks run for every cut-off, and nothing is saved if one fails.
+
+**Why.**
+
+- *Re-censoring.* At the cut-off a defender could not know that a CVE would be
+  listed two years later. If the train set kept that event, the model would
+  learn from the future and its test result would look better than it is. A
+  CVE that has not been listed by the cut-off is "not exploited yet", which is
+  exactly what a censored row says.
+- *The cut-off day.* The prediction is made at the start of the cut-off day,
+  and test CVEs are published from that day. Counting a listing on the cut-off
+  day as known would let one day of the future into training. Only 1 train
+  event in the four cut-offs is dated exactly on its cut-off day, so the choice
+  changes almost nothing, but the rule is the safe one.
+- *The test window of 365 days.* The Brier score is reported at 30, 90 and 365
+  days. A test CVE needs at least 365 days of follow-up for the 365-day
+  horizon to be settled, and the proposal withholds CVEs whose outcome is not
+  settled. With these cut-offs, every test CVE has at least 365 days before the
+  snapshot, and a check enforces it. A window that is too long would also make
+  the test set drift from the situation at the cut-off.
+
+**Limits.**
+
+- The CVSS and CWE values in the train set are still the values on the
+  download days (decision 3). The split cannot restore the values of the
+  cut-off date, so results stay "retrospective".
+- Test windows of neighbouring cut-offs overlap (2022-01-01 and 2022-07-01
+  share half a year), so the four results are not independent.
+- Each test set has about 100 to 150 events, so confidence intervals will be
+  wide.
 ## How to check
 
 Run from the repository root. Each command prints the report that the numbers
@@ -230,6 +296,7 @@ uv run python -m vesper.components.b_survival.clean_nvd
 uv run python -m vesper.components.b_survival.clean_exploitdb
 uv run python -m vesper.components.b_survival.eda
 uv run python -m vesper.components.b_survival.survival_table
+uv run python -m vesper.components.b_survival.split_data
 ```
 
 - Decisions 1 and 3: "CVSS missing by publication year".
@@ -244,3 +311,4 @@ uv run python -m vesper.components.b_survival.survival_table
 - Decision 10: "Share with exploit_at_publication" in `survival_table`, and
   section 6 of `eda`.
 - Decision 11: "Checks" in `survival_table`.
+- Decision 12: the table per cut-off and the `check` lines printed by `split_data`.
