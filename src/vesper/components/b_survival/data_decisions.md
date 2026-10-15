@@ -286,6 +286,73 @@ own it knows how every CVE ended up.
   share half a year), so the four results are not independent.
 - Each test set has about 100 to 150 events, so confidence intervals will be
   wide.
+## 13. Kaplan–Meier and log-rank
+
+**What I found.** Only 1,469 of the 308,509 CVEs used are events. The
+Kaplan–Meier survival curve S(t), the share of CVEs NOT yet listed in KEV,
+stays above 99% for every group, so differences between groups cannot be seen
+on it.
+
+**The numbers.** Printed by `kaplan_meier` for the main analysis: the
+cumulative incidence of KEV listing at 365 days is 0.31% (95% CI 0.29–0.33)
+overall, 0.94% (0.85–1.04) for critical CVSS, 0.37% (0.34–0.41) for high and
+0.08% (0.07–0.10) for medium. The median time to listing is "not reached" in
+every group, because no group reaches 50%.
+
+**What I decided.**
+
+- The figures and tables show the cumulative incidence, 1 − S(t): the share of
+  CVEs listed in KEV by day t. It is reported at 30, 90 and 365 days with a 95%
+  interval (Greenwood's formula on the log(−log) scale, the `lifelines`
+  default), and plotted from 0 to 1,095 days.
+- A median that is not reached is reported as "not reached", not estimated.
+- If a group had no event up to a day, the incidence is 0 and no interval is
+  given ("no events"): Greenwood's formula gives a width of zero then, which
+  would look like certainty. After the longest follow-up of a group (for
+  example 365 days for CVEs published in 2026) no value is given.
+- The 65 `already_exploited` CVEs are dropped before any curve is fitted,
+  because `lifelines` accepts negative durations without a warning (decision 7).
+- The main analysis uses the other 308,509 CVEs. A sensitivity analysis also
+  drops the 280 `kev_launch_group` CVEs (308,229 left).
+- Groups: CVSS v3 severity bands (none 0.0, low, medium, high, critical) plus
+  missing; attack vector plus missing; `exploit_at_publication` yes or no; the 5
+  CWE IDs found in the most CVEs plus other and missing; and publication year.
+  A CVE with several CWEs goes to its highest-ranked top-5 CWE, so that every
+  CVE is in exactly one group.
+- Each grouping gets an overall log-rank test (`multivariate_logrank_test`).
+  Groupings with more than two groups also get pairwise tests, corrected with
+  Holm's method.
+
+**Why.**
+
+- *Cumulative incidence.* With rare events, 1 − S(t) shows the same
+  information as S(t) on a scale where the groups can be told apart.
+- *already_exploited and kev_launch_group.* A negative duration has no meaning
+  on a survival curve. The launch-group CVEs are kept in the main analysis
+  because they really were exploited, but their durations measure the start of
+  KEV, not exploitation, so the sensitivity analysis shows whether they drive
+  the results. Every log-rank test stays below p = 0.00001 without them.
+- *Descriptive only.* CVSS and CWE are the values on the download days, not on
+  the publication day (decision 3), and the groups are not compared under equal
+  conditions. A difference between curves is not a cause, and these results
+  are not predictions. With more than 300,000 CVEs almost any difference gives
+  a tiny p-value, so the size of the incidence matters more than the p-value.
+
+**Limits found in this step.**
+
+- *KEV did not exist before 2021-11-03.* A CVE published in 2016–2019 could
+  not be listed within 365 days of publication; their incidence at 365 days is
+  0.00 (no events). Pooling all years mixes CVEs that could be listed early with
+  CVEs that could not. This also explains why `exploit_at_publication` = yes
+  has a lower 365-day incidence (0.17%) than no (0.31%) while its log-rank test
+  is large: most of those CVEs are old and were listed years later. A curve
+  restricted to CVEs published from 2021-11-03 would not have this problem.
+- *CVSS missing.* The 10,043 CVEs without a CVSS 3.x score have 0 events. A
+  likely reason is that NVD scores a CVE soon after it is listed in KEV, so
+  missing CVSS partly reflects the outcome. `cvss_missing` should be treated
+  with care as a model input.
+- *Crossing curves.* The log-rank test is weakest when curves cross, as the
+  year curves do. Its p-values are reported but not used to rank groups.
 ## How to check
 
 Run from the repository root. Each command prints the report that the numbers
@@ -297,6 +364,7 @@ uv run python -m vesper.components.b_survival.clean_exploitdb
 uv run python -m vesper.components.b_survival.eda
 uv run python -m vesper.components.b_survival.survival_table
 uv run python -m vesper.components.b_survival.split_data
+uv run python -m vesper.components.b_survival.kaplan_meier
 ```
 
 - Decisions 1 and 3: "CVSS missing by publication year".
@@ -312,3 +380,4 @@ uv run python -m vesper.components.b_survival.split_data
   section 6 of `eda`.
 - Decision 11: "Checks" in `survival_table`.
 - Decision 12: the table per cut-off and the `check` lines printed by `split_data`.
+- Decision 13: the incidence table and the "Log-rank tests" lines printed by `kaplan_meier`.
