@@ -76,6 +76,19 @@ def test_parses_cpe_configuration_events():
     assert events[1].new_pairs == (("awesomemotive", "duplicator"),)
 
 
+def test_future_event_does_not_change_earlier_snapshot():
+    history = make_history()
+    history["cveChanges"].reverse()
+
+    result = reconstruct_relationships(
+        history,
+        datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+
+    assert result.affected == (("snapcreek", "duplicator"),)
+    assert ("awesomemotive", "duplicator") not in result.affected
+
+
 def test_reconstructs_vendor_before_remap():
     result = reconstruct_relationships(
         make_history(),
