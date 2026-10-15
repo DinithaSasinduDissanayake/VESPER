@@ -1,8 +1,7 @@
-
 """Tests for historical Component C relationship reconstruction."""
 
-from datetime import datetime, timezone
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import networkx as nx
@@ -82,7 +81,7 @@ def test_future_event_does_not_change_earlier_snapshot():
 
     result = reconstruct_relationships(
         history,
-        datetime(2025, 1, 1, tzinfo=timezone.utc),
+        datetime(2025, 1, 1, tzinfo=UTC),
     )
 
     assert result.affected == (("snapcreek", "duplicator"),)
@@ -92,7 +91,7 @@ def test_future_event_does_not_change_earlier_snapshot():
 def test_reconstructs_vendor_before_remap():
     result = reconstruct_relationships(
         make_history(),
-        datetime(2025, 1, 1, tzinfo=timezone.utc),
+        datetime(2025, 1, 1, tzinfo=UTC),
     )
 
     assert result.cve_id == "CVE-2018-25095"
@@ -104,7 +103,7 @@ def test_reconstructs_vendor_before_remap():
 def test_reconstructs_vendor_after_remap():
     result = reconstruct_relationships(
         make_history(),
-        datetime(2026, 2, 2, 15, 6, 21, tzinfo=timezone.utc),
+        datetime(2026, 2, 2, 15, 6, 21, tzinfo=UTC),
     )
 
     assert result.affected == (("awesomemotive", "duplicator"),)
@@ -114,7 +113,7 @@ def test_reconstructs_vendor_after_remap():
 def test_cutoff_before_first_cpe_event_has_no_confirmed_relationships():
     result = reconstruct_relationships(
         make_history(),
-        datetime(2024, 1, 1, tzinfo=timezone.utc),
+        datetime(2024, 1, 1, tzinfo=UTC),
     )
 
     assert result.affected == ()
@@ -128,11 +127,11 @@ def test_reconstructs_cwe_removal_from_real_history():
 
     before = reconstruct_relationships(
         history,
-        datetime(2024, 9, 1, tzinfo=timezone.utc),
+        datetime(2024, 9, 1, tzinfo=UTC),
     )
     after = reconstruct_relationships(
         history,
-        datetime(2024, 9, 26, tzinfo=timezone.utc),
+        datetime(2024, 9, 26, tzinfo=UTC),
     )
 
     assert before.cwe_ids == ("CWE-120", "CWE-787")
@@ -142,21 +141,15 @@ def test_reconstructs_cwe_removal_from_real_history():
 def test_preserves_original_cpe_version_constraints():
     events = parse_cpe_events(make_history())
 
-    assert "versions up to (excluding) 1.3.0" in (
-        events[0].new_configurations[0]
-    )
-    assert "versions from (excluding) 1.3.0" in (
-        events[1].old_configurations[0]
-    )
-    assert "versions from (excluding) 1.3.0" in (
-        events[1].new_configurations[0]
-    )
+    assert "versions up to (excluding) 1.3.0" in (events[0].new_configurations[0])
+    assert "versions from (excluding) 1.3.0" in (events[1].old_configurations[0])
+    assert "versions from (excluding) 1.3.0" in (events[1].new_configurations[0])
 
 
 def test_build_historical_graph_contains_reconstructed_relationships():
     relationships = reconstruct_relationships(
         make_history(),
-        datetime(2025, 1, 1, tzinfo=timezone.utc),
+        datetime(2025, 1, 1, tzinfo=UTC),
     )
 
     graph = build_historical_graph(relationships)
@@ -189,7 +182,7 @@ def test_historical_pipeline_exports_features_and_metadata(tmp_path):
     metadata = run_historical_pipeline(
         history_path=history_path,
         output_path=output_path,
-        snapshot_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        snapshot_at=datetime(2025, 1, 1, tzinfo=UTC),
     )
 
     assert output_path.exists()
@@ -199,15 +192,13 @@ def test_historical_pipeline_exports_features_and_metadata(tmp_path):
     assert metadata["feature_rows"] == 1
 
     saved_metadata = json.loads(
-        output_path.with_suffix(".metadata.json").read_text(
-            encoding="utf-8"
-        )
+        output_path.with_suffix(".metadata.json").read_text(encoding="utf-8")
     )
     assert saved_metadata == metadata
 
 
 def test_multi_cve_graph_shares_vendor_and_product_nodes():
-    cutoff = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    cutoff = datetime(2025, 1, 1, tzinfo=UTC)
 
     first = reconstruct_relationships(make_history(), cutoff)
     second = reconstruct_relationships(
@@ -230,11 +221,7 @@ def test_multi_cve_graph_shares_vendor_and_product_nodes():
         "cve:CVE-2023-12345",
     )
 
-    cve_nodes = [
-        node
-        for node, data in graph.nodes(data=True)
-        if data.get("node_type") == "cve"
-    ]
+    cve_nodes = [node for node, data in graph.nodes(data=True) if data.get("node_type") == "cve"]
     assert len(cve_nodes) == 2
 
     # Shared vendor/product nodes must not be duplicated.
@@ -245,11 +232,12 @@ def test_multi_cve_graph_shares_vendor_and_product_nodes():
 def test_multi_cve_graph_rejects_duplicate_cves():
     relationships = reconstruct_relationships(
         make_history(),
-        datetime(2025, 1, 1, tzinfo=timezone.utc),
+        datetime(2025, 1, 1, tzinfo=UTC),
     )
 
     with pytest.raises(ValueError, match="Duplicate CVE"):
         build_multi_cve_historical_graph([relationships, relationships])
+
 
 def test_multi_historical_pipeline_exports_features_and_metadata(tmp_path):
     from vesper.components.c_graph.multi_historical_pipeline import (
@@ -273,7 +261,7 @@ def test_multi_historical_pipeline_exports_features_and_metadata(tmp_path):
     metadata = run_multi_historical_pipeline(
         history_dir=history_dir,
         output_path=output_path,
-        snapshot_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        snapshot_at=datetime(2025, 1, 1, tzinfo=UTC),
     )
 
     assert output_path.exists()
@@ -284,9 +272,7 @@ def test_multi_historical_pipeline_exports_features_and_metadata(tmp_path):
     assert metadata["history_complete"] is False
 
     saved_metadata = json.loads(
-        output_path.with_suffix(".metadata.json").read_text(
-            encoding="utf-8"
-        )
+        output_path.with_suffix(".metadata.json").read_text(encoding="utf-8")
     )
     assert saved_metadata == metadata
 
@@ -303,5 +289,43 @@ def test_multi_historical_pipeline_rejects_empty_history_directory(tmp_path):
         run_multi_historical_pipeline(
             history_dir=history_dir,
             output_path=tmp_path / "features.csv",
-            snapshot_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            snapshot_at=datetime(2025, 1, 1, tzinfo=UTC),
         )
+
+
+def test_affected_github_reference_is_not_treated_as_cpe_data():
+    history = {
+        "cveChanges": [
+            {
+                "change": {
+                    "cveId": "CVE-2026-90928",
+                    "cveChangeId": "affected-reference",
+                    "created": "2026-09-14T13:19:30.870",
+                    "details": [
+                        {
+                            "action": "Added",
+                            "type": "Affected",
+                            "newValue": (
+                                "New affected value received. "
+                                '<a href="https://github.com/CVEProject/'
+                                "cvelistV5/blob/main/cves/2026/90xxx/"
+                                'CVE-2026-90928.json">CVE-2026-90928</a>'
+                            ),
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+
+    result = reconstruct_relationships(
+        history,
+        datetime(2026, 10, 14, 23, 59, 59, tzinfo=UTC),
+    )
+
+    assert result.cve_id == "CVE-2026-90928"
+    assert result.affected == ()
+    assert result.history_complete is False
+    assert any(
+        "Affected" in warning and "reconstruct" in warning.lower() for warning in result.warnings
+    )

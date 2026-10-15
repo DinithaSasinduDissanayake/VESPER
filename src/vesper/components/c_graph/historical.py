@@ -1,15 +1,13 @@
-
 """Reconstruct vendor/product and CWE relationships from NVD history."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import re
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import networkx as nx
-
 
 CPE_PATTERN = re.compile(r"cpe:2\.3:([^:\s]+):([^:\s]+):([^:\s]+)")
 CWE_PATTERN = re.compile(r"\bCWE-\d+\b", re.IGNORECASE)
@@ -68,9 +66,9 @@ def _parse_timestamp(value: Any) -> datetime:
     parsed = datetime.fromisoformat(normalized)
 
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
 
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _history_cve_id(history: dict[str, Any]) -> str:
@@ -90,9 +88,7 @@ def _history_cve_id(history: dict[str, Any]) -> str:
     }
 
     if len(cve_ids) != 1:
-        raise ValueError(
-            "History response must contain events for exactly one valid CVE"
-        )
+        raise ValueError("History response must contain events for exactly one valid CVE")
 
     return next(iter(cve_ids))
 
@@ -187,14 +183,10 @@ def parse_cpe_events(history: dict[str, Any]) -> tuple[CPEEvent, ...]:
         new_pairs = _extract_cpe_pairs(new_value)
 
         old_configurations = (
-            (old_value.strip(),)
-            if isinstance(old_value, str) and old_value.strip()
-            else ()
+            (old_value.strip(),) if isinstance(old_value, str) and old_value.strip() else ()
         )
         new_configurations = (
-            (new_value.strip(),)
-            if isinstance(new_value, str) and new_value.strip()
-            else ()
+            (new_value.strip(),) if isinstance(new_value, str) and new_value.strip() else ()
         )
 
         if action == "Added" and not new_pairs:
@@ -232,9 +224,7 @@ def parse_cwe_events(history: dict[str, Any]) -> tuple[CWEEvent, ...]:
         if action not in {"Added", "Removed", "Changed"}:
             continue
 
-        old_cwes = _extract_cwe_ids(
-            detail.get("oldValue", detail.get("previousValue"))
-        )
+        old_cwes = _extract_cwe_ids(detail.get("oldValue", detail.get("previousValue")))
         new_cwes = _extract_cwe_ids(detail.get("newValue"))
 
         if action == "Added" and not new_cwes:
@@ -270,7 +260,7 @@ def reconstruct_relationships(
     if snapshot_at.tzinfo is None:
         raise ValueError("snapshot_at must be timezone-aware")
 
-    snapshot_at = snapshot_at.astimezone(timezone.utc)
+    snapshot_at = snapshot_at.astimezone(UTC)
     cve_id = _history_cve_id(history)
     raw_changes = history["cveChanges"]
 
@@ -289,13 +279,34 @@ def reconstruct_relationships(
     affected: set[tuple[str, str]] = set()
     cwe_ids: set[str] = set()
 
+    # NVD history may reference external affected-product data without
+    # including the actual CPE values. Report this limitation explicitly.
+    for created_at, event_id, detail_cve_id, detail in _iter_details(history):
+        if detail_cve_id != cve_id or created_at > snapshot_at:
+            continue
+
+        if detail.get("type") != "Affected":
+            continue
+
+        if detail.get("action") not in {"Added", "Removed", "Changed"}:
+            continue
+
+        old_value = detail.get("oldValue", detail.get("previousValue"))
+        new_value = detail.get("newValue")
+
+        if not _extract_cpe_pairs(old_value) and not _extract_cpe_pairs(new_value):
+            warnings.append(
+                f"Affected event {event_id or '(unknown ID)'} "
+                "cannot be reconstructed from the history payload because "
+                "it contains no interpretable CPE vendor/product values."
+            )
+
     if not cpe_events:
         warnings.append("No interpretable CPE events exist by the cutoff.")
     else:
         if cpe_events[0].action != "Added":
             warnings.append(
-                "The earliest CPE event is not an addition; "
-                "the starting state is uncertain."
+                "The earliest CPE event is not an addition; the starting state is uncertain."
             )
 
         for event in cpe_events:
@@ -419,6 +430,7 @@ def build_historical_graph(
 
     return graph
 
+
 def build_multi_cve_historical_graph(
     relationships_list: list[HistoricalRelationships],
 ) -> nx.DiGraph:
@@ -428,9 +440,7 @@ def build_multi_cve_historical_graph(
 
     for relationships in relationships_list:
         if relationships.cve_id in seen_cves:
-            raise ValueError(
-                f"Duplicate CVE history supplied: {relationships.cve_id}"
-            )
+            raise ValueError(f"Duplicate CVE history supplied: {relationships.cve_id}")
 
         seen_cves.add(relationships.cve_id)
 
