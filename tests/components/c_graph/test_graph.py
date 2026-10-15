@@ -1,7 +1,6 @@
-
 """Tests for the Component C knowledge graph."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -17,8 +16,8 @@ def make_vulnerability(
     """Create a valid vulnerability record for graph tests."""
     return Vulnerability(
         cve_id=cve_id,
-        published_at=datetime(2024, 1, 10, tzinfo=timezone.utc),
-        last_modified_at=datetime(2024, 1, 15, tzinfo=timezone.utc),
+        published_at=datetime(2024, 1, 10, tzinfo=UTC),
+        last_modified_at=datetime(2024, 1, 15, tzinfo=UTC),
         description="Example vulnerability",
         cvss_base_score=7.5,
         cvss_version="3.1",
@@ -37,8 +36,14 @@ def test_builds_vendor_product_cve_and_cwe_relationships():
     assert graph.has_edge("product:examplevendor:exampleproduct", "cve:CVE-2024-12345")
     assert graph.has_edge("cve:CVE-2024-12345", "cwe:CWE-79")
 
-    assert graph["vendor:examplevendor"]["product:examplevendor:exampleproduct"]["relation"] == "offers"
-    assert graph["product:examplevendor:exampleproduct"]["cve:CVE-2024-12345"]["relation"] == "affected_by"
+    assert (
+        graph["vendor:examplevendor"]["product:examplevendor:exampleproduct"]["relation"]
+        == "offers"
+    )
+    assert (
+        graph["product:examplevendor:exampleproduct"]["cve:CVE-2024-12345"]["relation"]
+        == "affected_by"
+    )
     assert graph["cve:CVE-2024-12345"]["cwe:CWE-79"]["relation"] == "has_weakness"
 
 

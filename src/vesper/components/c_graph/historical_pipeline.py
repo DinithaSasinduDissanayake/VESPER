@@ -1,12 +1,11 @@
-
 """Build and export graph features from reconstructed NVD history."""
 
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +46,7 @@ def run_historical_pipeline(
     if snapshot_at.tzinfo is None:
         raise ValueError("snapshot_at must be timezone-aware")
 
-    snapshot_at = snapshot_at.astimezone(timezone.utc)
+    snapshot_at = snapshot_at.astimezone(UTC)
 
     with history_path.open("r", encoding="utf-8") as file:
         history = json.load(file)
@@ -77,15 +76,14 @@ def run_historical_pipeline(
         "history_complete": relationships.history_complete,
         "warnings": list(relationships.warnings),
         "reconstructed_affected": [
-            {"vendor": vendor, "product": product}
-            for vendor, product in relationships.affected
+            {"vendor": vendor, "product": product} for vendor, product in relationships.affected
         ],
         "reconstructed_cwe_ids": list(relationships.cwe_ids),
         "graph_nodes": graph.number_of_nodes(),
         "graph_edges": graph.number_of_edges(),
         "feature_rows": len(features),
         "output_csv": str(output_path),
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
     }
 
     metadata_path = output_path.with_suffix(".metadata.json")
@@ -96,9 +94,7 @@ def run_historical_pipeline(
 
 def main() -> None:
     """Run historical feature export from the command line."""
-    parser = argparse.ArgumentParser(
-        description="Export Component C features from NVD history."
-    )
+    parser = argparse.ArgumentParser(description="Export Component C features from NVD history.")
     parser.add_argument(
         "--history",
         type=Path,

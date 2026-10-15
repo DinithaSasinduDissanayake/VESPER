@@ -1,4 +1,3 @@
-
 """Run the Component C NVD-to-graph-feature pipeline."""
 
 import argparse
@@ -6,7 +5,7 @@ import gzip
 import json
 import os
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -150,13 +149,11 @@ def run_pipeline(
         "monthly_file_count": len(monthly_files),
         "parsed_cve_count": len(vulnerabilities),
         "skipped_after_cutoff_count": skipped_after_cutoff,
-        "skipped_published_after_cutoff_count": (
-            skipped_published_after_cutoff
-        ),
+        "skipped_published_after_cutoff_count": (skipped_published_after_cutoff),
         "skipped_rejected_count": skipped_rejected,
         "graph_summary": graph_summary(graph),
         "output_csv": str(output_path),
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
         "historical_reconstruction": "not_performed",
     }
 

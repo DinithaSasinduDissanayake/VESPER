@@ -1,4 +1,3 @@
-
 """Build the Component C vendor/product/CVE/CWE knowledge graph."""
 
 from collections.abc import Iterable
@@ -84,9 +83,7 @@ def graph_summary(graph: nx.DiGraph) -> dict[str, int]:
     """Return node counts by entity type and the total edge count."""
     counts = {
         node_type: sum(
-            1
-            for _, attributes in graph.nodes(data=True)
-            if attributes.get(NODE_TYPE) == node_type
+            1 for _, attributes in graph.nodes(data=True) if attributes.get(NODE_TYPE) == node_type
         )
         for node_type in ("vendor", "product", "cve", "cwe")
     }

@@ -1,7 +1,6 @@
-
 """Tests for Component C graph-derived features."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from vesper.components.c_graph.graph import build_graph
 from vesper.components.c_graph.scoring import calculate_graph_features
@@ -15,8 +14,8 @@ def make_vulnerability(
 ) -> Vulnerability:
     return Vulnerability(
         cve_id=cve_id,
-        published_at=datetime(2024, 1, 10, tzinfo=timezone.utc),
-        last_modified_at=datetime(2024, 1, 15, tzinfo=timezone.utc),
+        published_at=datetime(2024, 1, 10, tzinfo=UTC),
+        last_modified_at=datetime(2024, 1, 15, tzinfo=UTC),
         description="Example vulnerability",
         cvss_base_score=7.5,
         cvss_version="3.1",
@@ -53,9 +52,7 @@ def test_feature_values_are_finite_and_non_negative():
 
     features = calculate_graph_features(graph)
 
-    numeric = features[
-        ["in_degree_centrality", "out_degree_centrality", "pagerank"]
-    ]
+    numeric = features[["in_degree_centrality", "out_degree_centrality", "pagerank"]]
     assert numeric.notna().all().all()
     assert (numeric >= 0).all().all()
 

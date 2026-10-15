@@ -1,11 +1,9 @@
-
 """Export Component C graph features to CSV."""
 
 import argparse
 from pathlib import Path
 
 from vesper.components.c_graph.scoring import calculate_graph_features
-from vesper.config import load_settings
 
 
 def export_features_to_csv(
@@ -40,10 +38,7 @@ def main() -> None:
         default=None,
         help="CSV output path (defaults to outputs/c_graph_features.csv).",
     )
-    args = parser.parse_args()
-
-    settings = load_settings()
-    output_path = args.output or settings.outputs / "c_graph_features.csv"
+    parser.parse_args()
 
     parser.error(
         "Graph loading is not implemented yet. "

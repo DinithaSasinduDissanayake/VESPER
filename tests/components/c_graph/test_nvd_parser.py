@@ -1,12 +1,10 @@
-
 """Tests for the Component C NVD parser."""
 
-from datetime import date, timezone
+from datetime import date
 
 import pytest
 
 from vesper.components.c_graph.nvd_parser import parse_nvd_record
-
 
 SNAPSHOT_DATE = date(2024, 1, 31)
 
@@ -123,6 +121,7 @@ def test_missing_timestamp_is_rejected():
     with pytest.raises(ValueError, match="NVD timestamp"):
         parse_nvd_record(record, SNAPSHOT_DATE)
 
+
 def test_extract_affected_from_cpe_configuration():
     from vesper.components.c_graph.nvd_parser import _extract_affected
 
@@ -143,10 +142,7 @@ def test_extract_affected_from_cpe_configuration():
                         "cpeMatch": [
                             {
                                 "vulnerable": True,
-                                "criteria": (
-                                    "cpe:2.3:a:flycms_project:flycms:"
-                                    "*:*:*:*:*:*:*:*"
-                                ),
+                                "criteria": ("cpe:2.3:a:flycms_project:flycms:*:*:*:*:*:*:*:*"),
                             },
                         ],
                     },

@@ -1,4 +1,3 @@
-
 """Calculate graph-derived features for Component C CVE nodes."""
 
 import math
@@ -25,9 +24,7 @@ def calculate_graph_features(graph: nx.DiGraph) -> pd.DataFrame:
     zero because the usual normalization denominator is zero.
     """
     cve_nodes = sorted(
-        node
-        for node, attributes in graph.nodes(data=True)
-        if attributes.get("node_type") == "cve"
+        node for node, attributes in graph.nodes(data=True) if attributes.get("node_type") == "cve"
     )
 
     if not cve_nodes:

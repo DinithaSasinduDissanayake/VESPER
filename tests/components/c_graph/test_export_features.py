@@ -1,21 +1,20 @@
-
 """Tests for Component C graph feature exports."""
 
-import pandas as pd
+from datetime import UTC, date, datetime
+
 import networkx as nx
+import pandas as pd
 
 from vesper.components.c_graph.export_features import export_features_to_csv
 from vesper.components.c_graph.graph import build_graph
 from vesper.contracts.vulnerability import Vulnerability
 
-from datetime import date, datetime, timezone
-
 
 def make_vulnerability() -> Vulnerability:
     return Vulnerability(
         cve_id="CVE-2024-12345",
-        published_at=datetime(2024, 1, 10, tzinfo=timezone.utc),
-        last_modified_at=datetime(2024, 1, 15, tzinfo=timezone.utc),
+        published_at=datetime(2024, 1, 10, tzinfo=UTC),
+        last_modified_at=datetime(2024, 1, 15, tzinfo=UTC),
         description="Example vulnerability",
         cvss_base_score=7.5,
         cvss_version="3.1",

@@ -1,12 +1,11 @@
-
 """Build graph features from multiple reconstructed NVD history files."""
 
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +53,7 @@ def run_multi_historical_pipeline(
     if not history_dir.is_dir():
         raise NotADirectoryError(f"History directory not found: {history_dir}")
 
-    snapshot_at = snapshot_at.astimezone(timezone.utc)
+    snapshot_at = snapshot_at.astimezone(UTC)
     history_files = sorted(history_dir.glob("CVE-*.json"))
 
     if limit is not None:
@@ -92,9 +91,7 @@ def run_multi_historical_pipeline(
             )
 
     if not relationships_list:
-        raise ValueError(
-            f"No valid history files could be reconstructed; errors: {errors}"
-        )
+        raise ValueError(f"No valid history files could be reconstructed; errors: {errors}")
 
     graph = build_multi_cve_historical_graph(relationships_list)
     features = calculate_graph_features(graph)
@@ -111,9 +108,7 @@ def run_multi_historical_pipeline(
 
     graph_summary = {
         node_type: sum(
-            1
-            for _, data in graph.nodes(data=True)
-            if data.get("node_type") == node_type
+            1 for _, data in graph.nodes(data=True) if data.get("node_type") == node_type
         )
         for node_type in ("vendor", "product", "cve", "cwe")
     }
@@ -138,7 +133,7 @@ def run_multi_historical_pipeline(
         "graph_summary": graph_summary,
         "feature_rows": len(features),
         "output_csv": str(output_path),
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
     }
 
     metadata_path = output_path.with_suffix(".metadata.json")

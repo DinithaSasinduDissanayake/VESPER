@@ -1,4 +1,3 @@
-
 """Tests for the Component C pipeline."""
 
 import gzip
@@ -117,9 +116,7 @@ def test_pipeline_records_input_and_output_metadata(tmp_path):
     )
 
     metadata_path = output_path.with_suffix(".metadata.json")
-    saved_metadata = json.loads(
-        metadata_path.read_text(encoding="utf-8")
-    )
+    saved_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
 
     assert saved_metadata == metadata
     assert metadata["monthly_file_count"] == 1
@@ -155,8 +152,6 @@ def test_pipeline_excludes_rejected_records_and_reports_count(tmp_path):
     assert metadata["skipped_rejected_count"] == 1
 
     saved_metadata = json.loads(
-        output_path.with_suffix(".metadata.json").read_text(
-            encoding="utf-8"
-        )
+        output_path.with_suffix(".metadata.json").read_text(encoding="utf-8")
     )
     assert saved_metadata["skipped_rejected_count"] == 1

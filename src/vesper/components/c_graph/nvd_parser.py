@@ -1,8 +1,7 @@
-
 """Parse NVD CVE records into VESPER's shared vulnerability contract."""
 
-from datetime import date, datetime, timezone
 import re
+from datetime import UTC, date, datetime
 from typing import Any
 
 from vesper.contracts.vulnerability import Vulnerability
@@ -24,9 +23,9 @@ def _parse_timestamp(value: str) -> datetime:
 
     # Interpret timestamps without a timezone suffix as UTC.
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
 
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _valid_identifier(value: Any) -> bool:
