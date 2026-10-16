@@ -33,11 +33,22 @@ durations of zero or more, and `lifelines` does not reject a negative one. The
 flag kev_launch_group is kept as a column so those CVEs can be filtered in a
 sensitivity analysis later.
 
-Input:   data/processed/b_survival/survival_table.csv
-Output:  data/processed/b_survival/splits/train_<cut-off>.csv
-         data/processed/b_survival/splits/test_<cut-off>.csv
+Every split is made for each cohort (COHORTS in study_design.py): "full" (all
+study CVEs) and "post_kev" (CVEs published on or after KEV_START_DATE, the
+main cohort for modelling). The cohort is chosen before the split, so a train
+set never holds a CVE from outside its cohort.
 
-Nothing is saved if a leakage check fails.
+A train set with fewer than MIN_TRAIN_EVENTS events is too small to fit a model
+reliably. Such a cut-off is NOT dropped: a warning is printed and recorded in
+split_summary.csv, so the decision stays visible.
+
+Input:   data/processed/b_survival/survival_table.csv
+Output:  data/processed/b_survival/splits/<cohort>/train_<cut-off>.csv
+         data/processed/b_survival/splits/<cohort>/test_<cut-off>.csv
+         data/processed/b_survival/splits/split_summary.csv   (one row per cohort
+                                                              and cut-off)
+
+Nothing is saved if a leakage check fails, in any cohort.
 
 Run from anywhere (run survival_table first):
     uv run python -m vesper.components.b_survival.split_data
@@ -47,15 +58,24 @@ import pandas as pd
 
 from vesper.components.b_survival.link_sources import as_day
 from vesper.components.b_survival.study_design import (
+    COHORTS,
     CUTOFF_DATES,
     MATURITY_DAYS,
     PROCESSED_SUBFOLDER,
     SNAPSHOT_DATE,
 )
-from vesper.components.b_survival.survival_table import CSV_DATE_FORMAT, OUTPUT_FILE_NAME
+from vesper.components.b_survival.survival_table import (
+    CSV_DATE_FORMAT,
+    OUTPUT_FILE_NAME,
+    filter_cohort,
+)
 from vesper.config import load_settings
 
 SPLITS_SUBFOLDER = "splits"
+SUMMARY_FILE_NAME = "split_summary.csv"
+
+# Fewer events than this in a train set: a warning is printed and recorded
+MIN_TRAIN_EVENTS = 100
 
 # Column names that must never be in a train or test file. The KEV date is the
 # outcome, and a plain "has an exploit" column would use an exploit that may
@@ -199,9 +219,16 @@ def check_test_follow_up(test, snapshot_date=SNAPSHOT_DATE, maturity_days=MATURI
     return int((test["published_at"].dt.normalize() > latest_day).sum())
 
 
-def run_checks(train, test, cutoff):
+def check_rows_in_cohort(table, cohort):
+    """Rows that do not belong to the cohort."""
+    return len(table) - len(filter_cohort(table, cohort))
+
+
+def run_checks(train, test, cutoff, cohort="full"):
     """Run every leakage check. Returns {check name: number that break the rule}."""
     return {
+        "every train row is in the cohort": check_rows_in_cohort(train, cohort),
+        "every test row is in the cohort": check_rows_in_cohort(test, cohort),
         "no train row published on or after the cut-off": check_train_published_before_cutoff(
             train, cutoff
         ),
@@ -242,11 +269,33 @@ def save_split(table, path):
     out.to_csv(path, index=False, date_format=CSV_DATE_FORMAT)
 
 
-def print_cutoff(cutoff, train, test, info, checks, window_days=MATURITY_DAYS):
+def small_train_warning(train, min_events=MIN_TRAIN_EVENTS):
+    """A warning text if the train set has fewer than min_events events, else None."""
+    events = int((train["event"] == 1).sum())
+    if events >= min_events:
+        return None
+    return f"only {events} train events (fewer than {min_events}); a model fit may be unreliable"
+
+
+def summary_row(cohort, cutoff, train, test, warning):
+    """One row of split_summary.csv."""
+    row = {"cohort": cohort, "cutoff": cutoff.isoformat()}
+    for name, table in (("train", train), ("test", test)):
+        for key, value in describe_split(table).items():
+            row[f"{name}_{key}"] = value
+    row["small_train_warning"] = warning is not None
+    row["warning"] = warning or ""
+    return row
+
+
+def print_cutoff(cohort, cutoff, train, test, info, checks, window_days=MATURITY_DAYS):
     """Print the small table of one cut-off and the result of its checks."""
     window_last_day = (as_day(cutoff) + pd.Timedelta(days=window_days - 1)).date()
     print()
-    print(f"Cut-off {cutoff.isoformat()}  (test CVEs published {cutoff} to {window_last_day})")
+    print(
+        f"[{cohort}] Cut-off {cutoff.isoformat()}"
+        f"  (test CVEs published {cutoff} to {window_last_day})"
+    )
     print(f"  {'':6}{'rows':>9}{'events':>9}{'censored':>10}{'event rate':>12}")
     for name, table in (("train", train), ("test", test)):
         d = describe_split(table)
@@ -265,8 +314,22 @@ def print_cutoff(cutoff, train, test, info, checks, window_days=MATURITY_DAYS):
         print(f"  check, {name}: {problems} ({status})")
 
 
-def main(settings=None, cutoffs=CUTOFF_DATES):
-    """Split at every cut-off, run the checks, print, and save if all checks pass."""
+def print_overview(rows):
+    """Print rows and events of every cohort and cut-off, with the warnings."""
+    print()
+    print("Overview (train / test)")
+    header = f"  {'cohort':<10}{'cut-off':<12}{'train rows':>11}{'events':>8}"
+    print(header + f"{'test rows':>11}{'events':>8}")
+    for row in rows:
+        mark = "  WARNING: small train set" if row["small_train_warning"] else ""
+        print(
+            f"  {row['cohort']:<10}{row['cutoff']:<12}{row['train_rows']:>11}"
+            f"{row['train_events']:>8}{row['test_rows']:>11}{row['test_events']:>8}{mark}"
+        )
+
+
+def main(settings=None, cutoffs=CUTOFF_DATES, cohorts=COHORTS, min_train_events=MIN_TRAIN_EVENTS):
+    """Split every cohort at every cut-off, run the checks, print, and save if all pass."""
     # Folders come from vesper.config
     settings = settings or load_settings()
     processed_dir = settings.data_processed / PROCESSED_SUBFOLDER
@@ -276,25 +339,39 @@ def main(settings=None, cutoffs=CUTOFF_DATES):
     print("Read:", processed_dir / OUTPUT_FILE_NAME, f"({len(table)} rows)")
     print("Test window:", MATURITY_DAYS, "days; snapshot date:", SNAPSHOT_DATE.isoformat())
 
-    # Work out and check every cut-off first. Nothing is saved before all pass.
-    results = []
-    failed = []
-    for cutoff in cutoffs:
-        train, test, info = split_at_cutoff(table, cutoff)
-        checks = run_checks(train, test, cutoff)
-        print_cutoff(cutoff, train, test, info, checks)
-        failed += [f"{cutoff}: {name}" for name, problems in checks.items() if problems]
-        results.append((cutoff, train, test))
+    # Work out and check every cohort and cut-off first. Nothing is saved before all pass.
+    results, summary_rows, failed = [], [], []
+    for cohort in cohorts:
+        cohort_table = filter_cohort(table, cohort)
+        print()
+        print(f"Cohort {cohort}: {len(cohort_table)} rows")
+        for cutoff in cutoffs:
+            train, test, info = split_at_cutoff(cohort_table, cutoff)
+            checks = run_checks(train, test, cutoff, cohort)
+            print_cutoff(cohort, cutoff, train, test, info, checks)
+            failed += [
+                f"{cohort} {cutoff}: {name}" for name, problems in checks.items() if problems
+            ]
 
+            # A small train set is kept, but the warning is printed and recorded
+            warning = small_train_warning(train, min_train_events)
+            if warning:
+                print(f"  WARNING [{cohort} {cutoff}]: {warning}")
+            summary_rows.append(summary_row(cohort, cutoff, train, test, warning))
+            results.append((cohort, cutoff, train, test))
+
+    print_overview(summary_rows)
     if failed:
         raise ValueError(f"Splits not saved. Failed checks: {failed}")
 
-    splits_dir.mkdir(parents=True, exist_ok=True)
-    for cutoff, train, test in results:
-        save_split(train, splits_dir / f"train_{cutoff.isoformat()}.csv")
-        save_split(test, splits_dir / f"test_{cutoff.isoformat()}.csv")
+    for cohort, cutoff, train, test in results:
+        cohort_dir = splits_dir / cohort
+        cohort_dir.mkdir(parents=True, exist_ok=True)
+        save_split(train, cohort_dir / f"train_{cutoff.isoformat()}.csv")
+        save_split(test, cohort_dir / f"test_{cutoff.isoformat()}.csv")
+    pd.DataFrame(summary_rows).to_csv(splits_dir / SUMMARY_FILE_NAME, index=False)
     print()
-    print("Saved", 2 * len(results), "files to:", splits_dir)
+    print("Saved", 2 * len(results), "split files and", SUMMARY_FILE_NAME, "to:", splits_dir)
     return splits_dir
 
 
