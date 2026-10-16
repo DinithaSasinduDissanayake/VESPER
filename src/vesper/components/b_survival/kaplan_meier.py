@@ -31,8 +31,15 @@ Groupings (each CVE is in exactly one group of each grouping):
                        with several CWEs goes to its highest-ranked top-5 CWE.
   year                 publication year
 
+Cohorts (COHORTS in study_design.py), each analysed separately:
+  full      every study CVE (the comparison)
+  post_kev  CVEs published on or after KEV_START_DATE, when a KEV listing was
+            possible from the publication day (the main cohort for modelling).
+            In the full cohort, CVEs published before KEV existed could not be
+            listed early, which makes their curves start late.
+
 Input:   data/processed/b_survival/survival_table.csv
-Output:  outputs/b_survival/kaplan_meier/
+Output:  outputs/b_survival/kaplan_meier/<cohort>/
            km_<analysis>_<grouping>.png    cumulative incidence, 0 to 1095 days
            km_summary.csv                  n, events, incidence at 30/90/365 days
            logrank_results.csv             overall and pairwise (Holm) tests
@@ -50,8 +57,8 @@ from lifelines.statistics import multivariate_logrank_test, pairwise_logrank_tes
 from matplotlib.colors import LinearSegmentedColormap
 
 from vesper.components.b_survival.split_data import load_survival_table
-from vesper.components.b_survival.study_design import PROCESSED_SUBFOLDER
-from vesper.components.b_survival.survival_table import OUTPUT_FILE_NAME
+from vesper.components.b_survival.study_design import COHORTS, PROCESSED_SUBFOLDER
+from vesper.components.b_survival.survival_table import OUTPUT_FILE_NAME, filter_cohort
 from vesper.config import load_settings
 
 # Draw straight to files; no window is opened
@@ -340,7 +347,7 @@ def group_colours(grouping, groups):
     return colours
 
 
-def plot_incidence(curves, grouping, analysis, path, summary_rows):
+def plot_incidence(curves, grouping, analysis, path, summary_rows, cohort="full"):
     """Cumulative incidence (in percent) of every group, from 0 to PLOT_MAX_DAYS days."""
     figure, axes = plt.subplots(figsize=(9, 5.2))
     figure.set_facecolor(COLOUR_BACKGROUND)
@@ -378,7 +385,7 @@ def plot_incidence(curves, grouping, analysis, path, summary_rows):
     axes.set_ylabel("Listed in KEV (cumulative %)", color=COLOUR_TEXT)
     title = grouping.replace("_", " ")
     axes.set_title(
-        f"Cumulative incidence of KEV listing by {title}  ({ANALYSES[analysis]})",
+        f"KEV listing by {title}  ({cohort} cohort, {ANALYSES[analysis]})",
         loc="left",
         fontsize=11,
     )
@@ -433,11 +440,14 @@ def incidence_cell(estimate, lower, upper):
     return f"{percent(estimate)} ({percent(lower)}-{percent(upper)})"
 
 
-def print_summary(summary, analysis):
+def print_summary(summary, analysis, cohort="full"):
     """Print the incidence table of one analysis."""
     rows = summary[summary["analysis"] == analysis]
     print()
-    print(f"Cumulative incidence of KEV listing, % with 95% CI  ({ANALYSES[analysis]})")
+    print(
+        f"Cumulative incidence of KEV listing, % with 95% CI"
+        f"  ({cohort} cohort, {ANALYSES[analysis]})"
+    )
     header = f"  {'grouping':<23}{'group':<17}{'n':>8}{'events':>7}"
     for day in REPORT_DAYS:
         header += f"{f'{day} days':>20}"
@@ -473,40 +483,100 @@ def print_logrank(logrank):
         )
 
 
-def main(settings=None):
-    """Run both analyses, print the summary, save the figures and the two CSVs."""
+def exploit_comparison(summary, logrank, analysis="main"):
+    """exploit_at_publication yes vs no: n, events, 365-day incidence and the log-rank p.
+
+    Returns {"yes": {...}, "no": {...}, "logrank_p": p or None}.
+    """
+    rows = summary[
+        (summary["analysis"] == analysis) & (summary["grouping"] == "exploit_at_publication")
+    ]
+    result = {}
+    for row in rows.itertuples():
+        result[row.group] = {
+            "n": int(row.n),
+            "events": int(row.events),
+            "incidence_365d": row.incidence_365d,
+            "ci_lower_365d": row.ci_lower_365d,
+            "ci_upper_365d": row.ci_upper_365d,
+        }
+    test = (
+        logrank[
+            (logrank["analysis"] == analysis)
+            & (logrank["grouping"] == "exploit_at_publication")
+            & (logrank["test"] == "overall")
+        ]
+        if len(logrank)
+        else logrank
+    )
+    result["logrank_p"] = float(test["p_value"].iloc[0]) if len(test) else None
+    return result
+
+
+def print_exploit_comparison(comparison, cohort):
+    """Print exploit_at_publication yes vs no for one cohort."""
+    print()
+    print(f"exploit_at_publication, {cohort} cohort (main analysis)")
+    for group in ("yes", "no"):
+        if group not in comparison:
+            continue
+        values = comparison[group]
+        cell = incidence_cell(
+            values["incidence_365d"], values["ci_lower_365d"], values["ci_upper_365d"]
+        )
+        print(f"  {group:<4} n={values['n']:<8} events={values['events']:<6} 365 days: {cell}")
+    if comparison["logrank_p"] is not None:
+        print(f"  log-rank p = {comparison['logrank_p']:.3g}")
+
+
+def main(settings=None, cohorts=COHORTS):
+    """Run both analyses for every cohort, print, and save the figures and CSVs."""
     # Folders come from vesper.config
     settings = settings or load_settings()
     table_path = settings.data_processed / PROCESSED_SUBFOLDER / OUTPUT_FILE_NAME
-    output_dir = settings.outputs / PROCESSED_SUBFOLDER / OUTPUT_SUBFOLDER
-    output_dir.mkdir(parents=True, exist_ok=True)
+    base_dir = settings.outputs / PROCESSED_SUBFOLDER / OUTPUT_SUBFOLDER
 
     table = load_survival_table(table_path)
     print("Read:", table_path, f"({len(table)} rows)")
-    print("  already_exploited rows dropped:", int(table["already_exploited"].sum()))
-    for analysis in ANALYSES:
-        print(f"  rows in the {analysis} analysis:", len(analysis_rows(table, analysis)))
 
-    all_summary, all_logrank = [], []
-    for analysis in ANALYSES:
-        summary_rows, logrank_rows, curves = run_analysis(table, analysis)
-        all_summary += summary_rows
-        all_logrank += logrank_rows
-        for grouping, grouping_curves in curves.items():
-            rows = [row for row in summary_rows if row["grouping"] == grouping]
-            path = output_dir / f"km_{analysis}_{grouping}.png"
-            plot_incidence(grouping_curves, grouping, analysis, path, rows)
+    comparisons = {}
+    for cohort in cohorts:
+        cohort_table = filter_cohort(table, cohort)
+        output_dir = base_dir / cohort
+        output_dir.mkdir(parents=True, exist_ok=True)
+        print()
+        print(f"=== Cohort {cohort}: {len(cohort_table)} rows ===")
+        print("  already_exploited rows dropped:", int(cohort_table["already_exploited"].sum()))
+        for analysis in ANALYSES:
+            rows_used = len(analysis_rows(cohort_table, analysis))
+            print(f"  rows in the {analysis} analysis:", rows_used)
 
-    summary = pd.DataFrame(all_summary)
-    logrank = pd.DataFrame(all_logrank)
-    summary.to_csv(output_dir / SUMMARY_FILE_NAME, index=False)
-    logrank.to_csv(output_dir / LOGRANK_FILE_NAME, index=False)
+        all_summary, all_logrank = [], []
+        for analysis in ANALYSES:
+            summary_rows, logrank_rows, curves = run_analysis(cohort_table, analysis)
+            all_summary += summary_rows
+            all_logrank += logrank_rows
+            for grouping, grouping_curves in curves.items():
+                rows = [row for row in summary_rows if row["grouping"] == grouping]
+                path = output_dir / f"km_{analysis}_{grouping}.png"
+                plot_incidence(grouping_curves, grouping, analysis, path, rows, cohort)
 
-    print_summary(summary, "main")
-    print_logrank(logrank)
-    print()
-    print("Saved figures,", SUMMARY_FILE_NAME, "and", LOGRANK_FILE_NAME, "to:", output_dir)
-    return output_dir
+        summary = pd.DataFrame(all_summary)
+        logrank = pd.DataFrame(all_logrank)
+        summary.insert(0, "cohort", cohort)
+        if len(logrank):
+            logrank.insert(0, "cohort", cohort)
+        summary.to_csv(output_dir / SUMMARY_FILE_NAME, index=False)
+        logrank.to_csv(output_dir / LOGRANK_FILE_NAME, index=False)
+
+        print_summary(summary, "main", cohort)
+        if len(logrank):
+            print_logrank(logrank)
+        comparisons[cohort] = exploit_comparison(summary, logrank)
+        print_exploit_comparison(comparisons[cohort], cohort)
+        print("Saved figures,", SUMMARY_FILE_NAME, "and", LOGRANK_FILE_NAME, "to:", output_dir)
+
+    return base_dir
 
 
 if __name__ == "__main__":

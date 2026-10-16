@@ -10,6 +10,7 @@ from vesper.components.b_survival.kaplan_meier import (
     add_groups,
     analysis_rows,
     cwe_group,
+    exploit_comparison,
     fit_km,
     holm_adjust,
     incidence_at,
@@ -19,6 +20,7 @@ from vesper.components.b_survival.kaplan_meier import (
     median_days,
     severity_band,
     summarize_group,
+    summarize_grouping,
     top_cwe_ids,
 )
 from vesper.components.b_survival.survival_table import OUTPUT_COLUMNS
@@ -323,17 +325,50 @@ def test_main_writes_the_figures_and_the_two_csv_files(tmp_path):
     out["exploit_first_date"] = ""
     out.to_csv(processed / "survival_table.csv", index=False, date_format="%Y-%m-%dT%H:%M:%S.%fZ")
 
-    output_dir = main(settings)
+    base_dir = main(settings)
 
-    assert output_dir == tmp_path / "outputs" / "b_survival" / "kaplan_meier"
-    names = {path.name for path in output_dir.iterdir()}
-    assert {"km_summary.csv", "logrank_results.csv"} <= names
-    assert "km_main_severity.png" in names
-    assert "km_sensitivity_year.png" in names
-    summary = pd.read_csv(output_dir / "km_summary.csv")
+    assert base_dir == tmp_path / "outputs" / "b_survival" / "kaplan_meier"
+    assert sorted(path.name for path in base_dir.iterdir()) == ["full", "post_kev"]
+    for cohort in ("full", "post_kev"):
+        names = {path.name for path in (base_dir / cohort).iterdir()}
+        assert {"km_summary.csv", "logrank_results.csv"} <= names
+        assert "km_main_severity.png" in names
+        assert "km_sensitivity_year.png" in names
+        logrank = pd.read_csv(base_dir / cohort / "logrank_results.csv")
+        assert set(logrank["test"]) <= {"overall", "pairwise"}
+        assert logrank["p_value"].between(0, 1).all()
+        assert set(logrank["cohort"]) == {cohort}
+
+    summary = pd.read_csv(base_dir / "full" / "km_summary.csv")
     overall = summary[(summary["grouping"] == "overall")].set_index("analysis")
     assert overall.loc["main", "n"] == 31  # CVE-X (already exploited) is left out
     assert overall.loc["sensitivity", "n"] == 30  # CVE-Y (launch group) is left out too
-    logrank = pd.read_csv(output_dir / "logrank_results.csv")
-    assert set(logrank["test"]) <= {"overall", "pairwise"}
-    assert logrank["p_value"].between(0, 1).all()
+
+    # post_kev: CVE-Y (published 2020) is not in the cohort at all
+    summary = pd.read_csv(base_dir / "post_kev" / "km_summary.csv")
+    overall = summary[(summary["grouping"] == "overall")].set_index("analysis")
+    assert overall.loc["main", "n"] == 30
+    assert overall.loc["sensitivity", "n"] == 30
+    assert set(summary["cohort"]) == {"post_kev"}
+
+
+def test_exploit_comparison_gives_yes_and_no_with_the_logrank_p():
+    rows = [row(f"CVE-Y{i}", 5 + i, 1, exploit=True) for i in range(5)]
+    # One censored "yes" CVE watched past day 365, so the 365-day value exists
+    rows += [row("CVE-Y5", 400, 0, exploit=True)]
+    rows += [row(f"CVE-N{i}", 900, 0) for i in range(20)]
+    rows += [row("CVE-N20", 800, 1)]
+    grouped = add_groups(survival_table(rows))
+    summary_rows, _ = summarize_grouping(grouped, "main", "exploit_at_publication")
+    summary = pd.DataFrame(summary_rows)
+    logrank = pd.DataFrame(logrank_tests(grouped, "main", "exploit_at_publication"))
+
+    comparison = exploit_comparison(summary, logrank)
+
+    assert comparison["yes"]["n"] == 6
+    assert comparison["yes"]["events"] == 5
+    assert comparison["yes"]["incidence_365d"] == pytest.approx(5 / 6)
+    assert comparison["no"]["n"] == 21
+    assert comparison["no"]["events"] == 1
+    assert comparison["no"]["incidence_365d"] == 0.0
+    assert 0 <= comparison["logrank_p"] < 0.001
