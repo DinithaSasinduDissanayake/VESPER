@@ -103,6 +103,123 @@ Anything else is not repaired.
 no ID is guessed. A code that would need a guess, such as removing a full stop
 or a space inside the number, is rejected and printed in the report.
 
+## 6. How the duration and the event are defined
+
+**What I found.** Most CVEs are not in KEV at the snapshot date. That does not
+mean they are safe: it only means they were not listed yet.
+
+**The number.** The survival table has 308,574 CVEs (one per study CVE). 1,534
+are events (listed in KEV up to the snapshot) and 307,040 are censored.
+
+**What I decided.**
+
+- `duration_days` is the number of calendar days (UTC) from the publication day
+  to the KEV day, if the CVE is in KEV, or to the snapshot day (2026-10-01) if
+  it is not. This is the same definition as `eda.py`.
+- `event` is 1 if the CVE is listed in KEV up to the snapshot, and 0 if it is
+  censored.
+
+**Why.** A censored CVE is known to be unexploited up to the snapshot, and the
+model should use that time. Counting calendar days (not hours) matches the
+source: KEV and ExploitDB give only a day. A CVE published on the snapshot day
+that is not in KEV gets duration 0 and stays censored.
+
+## 7. CVEs listed in KEV before their publication date are kept and flagged
+
+**What I found.** For some CVEs the KEV listing day is before the NVD
+publication day, so the duration is negative.
+
+**The number.** 65 CVEs. All 65 were published after KEV started.
+
+**What I decided.** The rows stay in the table and the duration is not changed
+(not set to 0 and not clipped). The column `already_exploited` is True for
+them. They are not removed.
+
+**Why.** Dropping them would hide a real feature of the data: exploitation was
+confirmed before NVD published the CVE. Keeping the true value and the flag
+lets the analysis be run with and without them, which is the sensitivity
+analysis promised in the proposal. The table does not remove them silently, so
+the model step must filter on `already_exploited` itself. This matters because
+`lifelines` accepted a negative duration without an error or a warning when
+tested on a small made-up table (Kaplan–Meier and Cox).
+
+## 8. CVEs listed on the first day of KEV are flagged as a group
+
+**What I found.** KEV started on 2021-11-03 with a large group of CVEs that
+had been exploited earlier, sometimes years earlier. For these CVEs the KEV day
+means "the catalogue started", not "exploitation was confirmed on this day".
+
+**The number.** 282 CVEs in the study have 2021-11-03 as their KEV day (the KEV
+file itself has 287; the rest were published before the study start).
+
+**What I decided.** They stay in the table as events, flagged by
+`kev_launch_group`.
+
+**Why.** Their durations are long because the catalogue did not exist, not
+because exploitation was slow. This is the reason the median time to KEV is
+152 days for all events but only 8 days for the CVEs published after
+2021-11-03 (`eda.py`). The flag allows a model without this group.
+
+## 9. Zero-day durations stay as events
+
+**What I found.** Some CVEs are listed in KEV on the same day they are
+published.
+
+**The number.** 164 events have a duration of 0 days.
+
+**What I decided.** They stay as events with duration 0. They are not moved to
+0.5 days and not removed.
+
+**Why.** Same-day listing is a real result and an important one: these are the
+CVEs for which a defender has no time. A duration of 0 is valid for the
+methods used (Kaplan–Meier and Cox use the order of the times).
+
+## 10. There is no "has any exploit" column
+
+**What I found.** ExploitDB gives the day an exploit was published. An exploit
+can appear before the CVE is published, on the same day, or months afterwards.
+
+**The number.** 334 of the 1,534 KEV CVEs have an ExploitDB exploit at any
+time up to the snapshot, but only 68 (4.43%) had one on or before their
+publication day. Among all 308,574 CVEs it is 0.75% (`eda.py` and
+`survival_table.py`).
+
+**What I decided.**
+
+- The Day-0 input `exploit_at_publication` is True only when the first exploit
+  is dated on or before the publication day.
+- The date `exploit_first_date` is kept separately, for the time-varying model.
+- A plain "has any exploit" column is not created.
+
+**Why.** A column that says "this CVE has an exploit" would be True for CVEs
+whose exploit appeared months after publication, and those are mostly CVEs that
+were attacked. The model would be learning from the future (look-ahead
+leakage). The first exploit date lets a model switch the covariate on only
+from the day the exploit appears.
+
+## 11. ExploitDB is the only source of exploit code, and the outcome is never an input
+
+**What I found.** The proposal names ExploitDB as the source of public exploit
+code. Other sources exist but are not part of the study yet.
+
+**What I decided.**
+
+- ExploitDB is the only exploit source used now. The function
+  `first_exploit_dates` takes a list of exploit tables, so a second source can
+  be added to the list later without changing the rest.
+- The `verified` column of ExploitDB is never read.
+- The KEV date is used only to make `duration_days`, `event`,
+  `already_exploited` and `kev_launch_group`. It is not written to the survival
+  table, so it cannot become an input by accident. A test changes the KEV dates
+  and checks that every input column stays the same.
+- Five checks run before the table is saved, and a failed check stops the
+  save: no duplicate CVE IDs, `event` only 0 or 1, no publication date after
+  the snapshot, no negative duration except for `already_exploited`, and a row
+  count equal to the study CVE count of `link_sources.py`. All five found 0
+  problems.
+
+**Why.** Keeping outcome and inputs apart is the main protection against
+leakage, and it is one of the rules of the project (CONTRIBUTING.md).
 ## How to check
 
 Run from the repository root. Each command prints the report that the numbers
@@ -111,6 +228,8 @@ above were read from.
 ```
 uv run python -m vesper.components.b_survival.clean_nvd
 uv run python -m vesper.components.b_survival.clean_exploitdb
+uv run python -m vesper.components.b_survival.eda
+uv run python -m vesper.components.b_survival.survival_table
 ```
 
 - Decisions 1 and 3: "CVSS missing by publication year".
@@ -119,3 +238,9 @@ uv run python -m vesper.components.b_survival.clean_exploitdb
   published after the snapshot date".
 - Decision 5: "CVE IDs accepted after tidying" and "Malformed CVE codes, not
   used".
+- Decisions 6, 7, 8 and 9: the "Survival table" block of `survival_table`
+  (rows, events, censored, already_exploited, kev_launch_group, events with
+  duration 0).
+- Decision 10: "Share with exploit_at_publication" in `survival_table`, and
+  section 6 of `eda`.
+- Decision 11: "Checks" in `survival_table`.
