@@ -16,6 +16,7 @@ from vesper.components.b_survival.survival_table import (
     check_no_duplicate_cve_ids,
     check_no_publication_after_snapshot,
     check_row_count,
+    filter_cohort,
     main,
     run_checks,
     summarize,
@@ -393,3 +394,37 @@ def test_main_writes_the_survival_table_and_stops_when_a_check_fails(tmp_path):
     assert saved.loc[0, "exploit_first_date"] == "2022-03-05"
     assert pd.isna(saved.loc[1, "exploit_first_date"])
     assert saved.loc[0, "published_at"] == "2022-03-01T10:00:00.000000Z"
+
+
+# --- Cohorts -----------------------------------------------------------------
+
+
+def test_post_kev_cohort_starts_on_the_kev_start_date():
+    table = build(
+        [
+            ("CVE-2021-0001", "2021-11-02T23:59:59", None, None),  # the day before: out
+            ("CVE-2021-0002", "2021-11-03T00:00:00", None, None),  # the first moment: in
+            ("CVE-2021-0003", "2021-11-03T18:00:00", None, None),
+            ("CVE-2024-0001", "2024-05-01T00:00:00", None, None),
+        ]
+    )
+
+    post_kev = filter_cohort(table, "post_kev")
+
+    assert list(post_kev["cve_id"]) == ["CVE-2021-0002", "CVE-2021-0003", "CVE-2024-0001"]
+    assert list(post_kev.index) == [0, 1, 2]
+
+
+def test_full_cohort_keeps_every_row_and_an_unknown_cohort_is_rejected():
+    table = build([("CVE-2016-0001", "2016-01-01", None, None)])
+
+    assert len(filter_cohort(table, "full")) == 1
+    with pytest.raises(ValueError, match="Unknown cohort"):
+        filter_cohort(table, "pre_kev")
+
+
+def test_kev_start_date_is_written_once():
+    from vesper.components.b_survival import clean_kev, study_design
+
+    assert clean_kev.KEV_START_DATE is study_design.KEV_START_DATE
+    assert study_design.KEV_START_DATE == date(2021, 11, 3)

@@ -57,7 +57,12 @@ from vesper.components.b_survival.link_sources import (
 from vesper.components.b_survival.link_sources import (
     print_report as print_link_report,
 )
-from vesper.components.b_survival.study_design import PROCESSED_SUBFOLDER, SNAPSHOT_DATE
+from vesper.components.b_survival.study_design import (
+    COHORTS,
+    KEV_START_DATE,
+    PROCESSED_SUBFOLDER,
+    SNAPSHOT_DATE,
+)
 from vesper.config import load_settings
 
 OUTPUT_FILE_NAME = "survival_table.csv"
@@ -132,6 +137,20 @@ def build_survival_table(linked, snapshot_date=SNAPSHOT_DATE):
         }
     )
     return table[OUTPUT_COLUMNS].reset_index(drop=True)
+
+
+def filter_cohort(table, cohort):
+    """Keep the rows of one cohort (see COHORTS in study_design.py).
+
+    full      every row
+    post_kev  rows published on or after KEV_START_DATE (from 00:00 UTC that
+              day), when a KEV listing was possible from the publication day
+    """
+    if cohort not in COHORTS:
+        raise ValueError(f"Unknown cohort: {cohort!r}")
+    if cohort == "post_kev":
+        table = table[table["published_at"] >= as_day(KEV_START_DATE)]
+    return table.reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
