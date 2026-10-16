@@ -353,6 +353,70 @@ every group, because no group reaches 50%.
   with care as a model input.
 - *Crossing curves.* The log-rank test is weakest when curves cross, as the
   year curves do. Its p-values are reported but not used to rank groups.
+## 14. Post-KEV cohort
+
+**What I found.** KEV started on 2021-11-03 (`KEV_START_DATE`). A CVE published
+before that day could not be listed in KEV until the catalogue existed, so its
+time to listing measures the start of KEV as much as exploitation. Section 13
+showed the effect: CVEs published in 2016–2019 have 0.00% at 365 days (no
+events), and `exploit_at_publication` = yes looked lower than no.
+
+**The numbers.** Printed by `kaplan_meier` and `split_data`:
+
+- The post_kev cohort has 218,492 CVEs (published from 2021-11-03), against
+  308,574 in the full cohort. After dropping the 65 `already_exploited` CVEs,
+  218,427 are used. None of the remaining post_kev CVEs is in
+  `kev_launch_group`, so its sensitivity analysis equals its main analysis.
+- Cumulative incidence at 365 days: 0.36% (0.34–0.39) in post_kev against
+  0.31% (0.29–0.33) in full.
+- `exploit_at_publication` in post_kev: yes is 144 CVEs with 4 events and
+  2.19% (0.71–6.66) at 365 days; no is 218,283 CVEs with 784 events and 0.36%
+  (0.34–0.39); log-rank p = 9.73e-06. In the full cohort the same comparison
+  was 0.17% for yes against 0.31% for no.
+- Publication year matters much less in post_kev (log-rank χ² 16.9, p = 0.0048,
+  1 of 15 pairs below Holm p < 0.05) than in full (χ² 104.1, 33 of 55 pairs).
+- Train events per cut-off in post_kev: 5 (2022-01-01), 47 (2022-07-01), 79
+  (2023-01-01) and 216 (2024-01-01). The test sets are the same in both cohorts,
+  because every cut-off is after 2021-11-03.
+
+**What I decided.**
+
+- Two cohorts (`COHORTS` in `study_design.py`): **post_kev is the main cohort
+  for modelling**, and **full is the comparison**. `KEV_START_DATE` is written
+  once, in `study_design.py`; `clean_kev.py` imports it from there.
+- `survival_table.filter_cohort` selects a cohort: post_kev keeps CVEs
+  published from 00:00 UTC on 2021-11-03 (a CVE from 2021-11-02 23:59:59 is
+  out).
+- `split_data` makes the splits of both cohorts, in
+  `splits/<cohort>/train_<cut-off>.csv` and `test_<cut-off>.csv`, and runs every
+  leakage check on both, plus a check that every row belongs to its cohort.
+  Nothing is saved if any check fails in either cohort.
+- A train set with fewer than 100 events is kept. A warning is printed and
+  recorded in `splits/split_summary.csv`. This happens for the post_kev
+  cut-offs 2022-01-01, 2022-07-01 and 2023-01-01.
+- `kaplan_meier` runs the same groupings for both cohorts, in
+  `outputs/b_survival/kaplan_meier/<cohort>/`.
+
+**Why.**
+
+- *post_kev as the main cohort.* In this cohort every CVE could be listed from
+  its publication day, so "days to KEV listing" means the same thing for every
+  CVE. That is the quantity the research question is about. The full cohort
+  mixes it with the start of the catalogue.
+- *full as the comparison.* It is larger and was used in the earlier steps, so
+  reporting both shows how much the choice of cohort changes the results.
+- *Keeping small train sets.* Dropping a cut-off without saying so would hide a
+  real limit of the data. With 5 or 47 events a Cox model is not reliable, and
+  results for those cut-offs must be read with that in mind.
+
+**Limits.**
+
+- Only one post_kev cut-off (2024-01-01) has at least 100 train events. With a
+  365-day test window and 365 days of follow-up after it, the latest possible
+  cut-off is about 2024-10-01, so later cut-offs could add at most a few
+  months. The cut-off dates are still proposed and wait for team agreement.
+- The `exploit_at_publication` = yes group in post_kev has only 144 CVEs and 4
+  events, so its interval is wide (0.71–6.66%).
 ## How to check
 
 Run from the repository root. Each command prints the report that the numbers
@@ -381,3 +445,6 @@ uv run python -m vesper.components.b_survival.kaplan_meier
 - Decision 11: "Checks" in `survival_table`.
 - Decision 12: the table per cut-off and the `check` lines printed by `split_data`.
 - Decision 13: the incidence table and the "Log-rank tests" lines printed by `kaplan_meier`.
+- Decision 14: the "Overview" and "WARNING" lines of `split_data`, and the
+  post_kev block and "exploit_at_publication, post_kev cohort" lines of
+  `kaplan_meier`.
