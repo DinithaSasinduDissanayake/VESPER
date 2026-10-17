@@ -8,6 +8,7 @@ dependencies = [
     "lifelines>=0.30.3",
     "matplotlib>=3.11.2",
     "networkx>=3.6.1",
+    "numpy>=2.0,<3",
     "pandas>=2.3.3",
     "pyarrow>=26.0.0",
     "python-dotenv>=1.0,<2",
