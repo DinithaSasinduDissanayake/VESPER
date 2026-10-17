@@ -155,6 +155,7 @@ def build_fused_dummy_dataset(
     result["signal_coverage"] = result["signals_used"] / len(signals.columns)
     result["fusion_score"] = signals.mean(axis=1).round(6)
     result["fusion_method"] = FUSION_METHOD
+    result["data_origin"] = "synthetic"
     result["decision_time"] = reference["decision_time"].iloc[0]
     result["horizon_days"] = int(reference["horizon_days"].iloc[0])
 
@@ -187,6 +188,7 @@ def build_fused_dummy_dataset(
         "signals_used",
         "signal_coverage",
         "fusion_method",
+        "data_origin",
     ]
     return result[output_columns].sort_values("cve_id", kind="stable").reset_index(drop=True)
 
