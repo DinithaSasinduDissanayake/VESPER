@@ -103,3 +103,22 @@ def test_features_are_sorted_by_cve_id():
         "CVE-2024-12345",
         "CVE-2024-12346",
     ]
+
+
+def test_symmetric_three_cve_cycle_has_hand_calculated_centralities():
+    import networkx as nx
+    import pytest
+
+    cve_ids = ["CVE-2024-12345", "CVE-2024-12346", "CVE-2024-12347"]
+    graph = nx.DiGraph()
+    nodes = [f"cve:{cve_id}" for cve_id in cve_ids]
+    for cve_id, node in zip(cve_ids, nodes, strict=True):
+        graph.add_node(node, node_type="cve", cve_id=cve_id)
+    graph.add_edges_from((nodes[index], nodes[(index + 1) % 3]) for index in range(3))
+
+    features = calculate_graph_features(graph).set_index("cve_id")
+
+    for cve_id in cve_ids:
+        assert features.loc[cve_id, "in_degree_centrality"] == pytest.approx(0.5)
+        assert features.loc[cve_id, "out_degree_centrality"] == pytest.approx(0.5)
+        assert features.loc[cve_id, "pagerank"] == pytest.approx(1 / 3)
