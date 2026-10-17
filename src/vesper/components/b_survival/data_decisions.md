@@ -417,6 +417,106 @@ events), and `exploit_at_publication` = yes looked lower than no.
   months. The cut-off dates are still proposed and wait for team agreement.
 - The `exploit_at_publication` = yes group in post_kev has only 144 CVEs and 4
   events, so its interval is wide (0.71–6.66%).
+## 15. Cox model and evaluation
+
+**What I found.** The Cox model was fitted on every train set of both cohorts
+and measured on the matching test set. post_kev is the main analysis and full
+is the comparison (section 14). The numbers below are printed by `evaluate`.
+
+**Features (Day-0 only, `features.py`).** `cvss_base_score` (standardised),
+the four CVSS vector parts (one dummy per level, the most common level is the
+reference), `exploit_at_publication`, and one dummy for each of the 10 CWE IDs
+found in the most train CVEs (every other CWE, and no CWE, is the reference).
+Everything is learned on the train set only and then applied unchanged to the
+test set. A feature that never changes in a train set is dropped there.
+
+**Excluded columns, and why.**
+
+- `in_kev`, `kev_date_added`: the outcome.
+- `exploit_first_date`: the exploit can appear after day 0 (decision 10).
+- `kev_launch_group`, `already_exploited`: made from the KEV date.
+- `cvss_missing`: CVEs without CVSS had 0 events (section 13), so missing CVSS
+  partly reflects the outcome. CVEs without a CVSS score are left out of train
+  and test instead: 0 to 231 train rows and 1 to 321 test rows per split, all
+  with 0 events.
+
+**Models and baselines.**
+
+- `cox`: Cox model on all features, with a small ridge penalty (0.01). Some
+  train sets have very few events and some dummies are rare; without a penalty
+  a coefficient can run off to infinity. Because of the penalty the intervals
+  of the hazard ratios are approximate.
+- `cvss_cox`: Cox model on the CVSS score only.
+- `cvss_rank`: test CVEs ranked by the CVSS score itself (current practice).
+  It has no "listed by day t" estimate, so no Brier score.
+- `km_reference`: the train Kaplan–Meier curve for every CVE (no features), the
+  reference for the Brier score.
+
+**Metrics.**
+
+- Harrell's c-index (lifelines), 0.5 = random.
+- Brier score at 30, 90 and 365 days with inverse probability of censoring
+  weights (IPCW), and the Brier skill at 365 days, 1 − Brier(model) /
+  Brier(km_reference).
+- P@100: the share of the 100 highest-risk test CVEs listed in KEV within 365
+  days. CVEs tied at the 100th place are shared out evenly, because CVSS scores
+  have many ties.
+- 95% intervals from 1,000 bootstrap resamples of the test set, seed 20261001,
+  the same resamples for every model.
+
+**A change from the plan: the censoring weights come from the test set.** The
+plan was to fit the censoring Kaplan–Meier on the train set. The split
+re-censors every train CVE at the cut-off (section 12), so train censoring is
+made by the split and does not describe the test set: for post_kev, G(365) on
+the train set is 0.000 at the cut-offs 2022-01-01 and 2022-07-01, which makes
+the weights undefined, and 0.496 at 2024-01-01. The test CVEs are only
+censored at the snapshot, after at least 365 days, so G(365) on every test set
+is 1.000. The censoring curve is therefore taken from the test set being
+evaluated, as in Graf et al. (1999). This uses only follow-up lengths, not
+model inputs.
+
+**Results.**
+
+- *Ranking (main cohort, latest cut-off).* post_kev 2024-01-01: c-index 0.775
+  (0.741–0.808) for `cox` against 0.763 (0.731–0.793) for `cvss_rank`. The
+  intervals overlap, so the Cox model has not been shown to rank better than
+  CVSS.
+- *Earlier post_kev cut-offs* have only 5, 47 and 79 train events, and the Cox
+  model ranks worse than CVSS at 2022-01-01 (0.688 against 0.728) and 2022-07-01
+  (0.693 against 0.710), and better at 2023-01-01 (0.710 against 0.681).
+- *full cohort:* `cox` 0.731, 0.721, 0.710 and 0.759, against 0.728, 0.710,
+  0.681 and 0.763 for `cvss_rank`; again with overlapping intervals.
+- `cvss_cox` and `cvss_rank` always give the same c-index and P@100: a Cox
+  model with one feature only rescales it, so the order is the same.
+- *Brier.* Every model, including the no-feature reference, has almost the
+  same Brier score, because only 0.32–0.46% of test CVEs are listed within 365
+  days. The Brier skill over the reference is at most 0.0020 (post_kev
+  2024-01-01), and -0.0001 at post_kev 2022-07-01.
+- *P@100* is between 0.00 and 0.03: at best about 2 of the 100 highest-risk
+  CVEs are listed within a year, against a base rate of 0.32–0.46%.
+- *Hazard ratios* (post_kev, 2024-01-01): `exploit_at_publication` 3.59
+  (1.08–11.86); CVSS 1.10 per point (1.06–1.15); CWE-79 0.79 (0.64–0.98) and
+  CWE-89 0.75 (0.57–1.00). In full: `exploit_at_publication` 2.10 (1.64–2.68)
+  and CVSS 1.15 per point (1.12–1.18).
+
+**Proportional-hazards check.** The Schoenfeld-residual test
+(`proportional_hazard_test`, rank time scale) on the post_kev 2024-01-01 train
+set finds 1 of 19 features below p = 0.05: `exploit_at_publication`
+(p = 0.044). With 19 tests about one such result is expected by chance, so the
+evidence is weak, but it is the feature with the largest effect. A stratified or
+time-varying model for it is the next step. The check was not run on the full
+cohort: lifelines needs more than 10 minutes for its 147,000 train rows
+(`PH_CHECK_COHORTS` in `evaluate.py`).
+
+**Limits.**
+
+- At the post_kev cut-offs 2022-01-01 and 2022-07-01 the longest train
+  follow-up is shorter than 365 days, so the 365-day estimates are extrapolated
+  (marked * in the printed table).
+- The logistic-regression baseline of the proposal (same features, same split)
+  is not done yet; it is the comparison the research question asks for.
+- A paired bootstrap of the difference between `cox` and `cvss_rank` (the same
+  resamples are already used for both) would test the difference directly.
 ## How to check
 
 Run from the repository root. Each command prints the report that the numbers
@@ -429,6 +529,7 @@ uv run python -m vesper.components.b_survival.eda
 uv run python -m vesper.components.b_survival.survival_table
 uv run python -m vesper.components.b_survival.split_data
 uv run python -m vesper.components.b_survival.kaplan_meier
+uv run python -m vesper.components.b_survival.evaluate
 ```
 
 - Decisions 1 and 3: "CVSS missing by publication year".
@@ -448,3 +549,5 @@ uv run python -m vesper.components.b_survival.kaplan_meier
 - Decision 14: the "Overview" and "WARNING" lines of `split_data`, and the
   post_kev block and "exploit_at_publication, post_kev cohort" lines of
   `kaplan_meier`.
+- Decision 15: the table and the "left out without CVSS" and "censoring G(365)"
+  lines printed by `evaluate`; hazard_ratios.csv and ph_check.csv.
