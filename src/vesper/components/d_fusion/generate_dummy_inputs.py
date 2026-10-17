@@ -5,7 +5,7 @@ import hashlib
 import math
 import re
 from collections import Counter
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 
 import pandas as pd
@@ -215,7 +215,10 @@ def _graph_scores(nvd: pd.DataFrame) -> dict[str, float]:
         centrality.append(value)
 
     percentiles = pd.Series(centrality).rank(method="average", pct=True).to_numpy()
-    return {cve_id: round(float(score), 6) for cve_id, score in zip(cve_order, percentiles)}
+    return {
+        cve_id: round(float(score), 6)
+        for cve_id, score in zip(cve_order, percentiles, strict=True)
+    }
 
 
 def _score_row(
@@ -260,11 +263,13 @@ def generate(settings, dummy_dir: Path, rows: int = TARGET_ROWS) -> None:
         raise ValueError("Dummy inputs require one shared NVD snapshot date")
     snapshot_date = nvd_snapshot_dates[0]
     decision_time = datetime.combine(
-        snapshot_date, time(23, 59, 59), tzinfo=timezone.utc
+        snapshot_date, time(23, 59, 59), tzinfo=UTC
     ).isoformat()
 
     feature_columns = ["cve_id", "description", "cwe_ids", "affected"]
-    candidates = baseline.merge(nvd[feature_columns], on="cve_id", how="inner", validate="one_to_one")
+    candidates = baseline.merge(
+        nvd[feature_columns], on="cve_id", how="inner", validate="one_to_one"
+    )
     candidates = candidates[
         candidates["cvss_base_score"].notna()
         & candidates["epss_score"].notna()

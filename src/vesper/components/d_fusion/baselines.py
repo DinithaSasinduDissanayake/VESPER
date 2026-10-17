@@ -1,7 +1,6 @@
 """Prepare the shared CVSS and EPSS baseline inputs for Component D."""
 
 import argparse
-from datetime import date
 
 import pandas as pd
 
