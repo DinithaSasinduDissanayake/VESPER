@@ -18,8 +18,10 @@ import pandas as pd
 from vesper.components.d_fusion.ensemble_models import (
     FEATURES,
     MODEL_NAMES,
+    GradientBoostedStumpModel,
     LogisticModel,
     feature_frame,
+    fit_gradient_boosting,
     fit_logistic,
     score_model,
 )
@@ -99,13 +101,22 @@ def _temporal_partitions(
     )
 
 
-def _fit_candidate(name: str, frame: pd.DataFrame) -> LogisticModel | None:
-    if name != "logistic_regression":
-        return None
-    return fit_logistic(feature_frame(frame), frame[LABEL_COLUMN])
+def _fit_candidate(
+    name: str, frame: pd.DataFrame
+) -> LogisticModel | GradientBoostedStumpModel | None:
+    features = feature_frame(frame)
+    if name == "logistic_regression":
+        return fit_logistic(features, frame[LABEL_COLUMN])
+    if name == "gradient_boosting":
+        return fit_gradient_boosting(features, frame[LABEL_COLUMN])
+    return None
 
 
-def _scores(name: str, frame: pd.DataFrame, model: LogisticModel | None) -> pd.Series:
+def _scores(
+    name: str,
+    frame: pd.DataFrame,
+    model: LogisticModel | GradientBoostedStumpModel | None,
+) -> pd.Series:
     return score_model(name, feature_frame(frame), model)
 
 
@@ -135,9 +146,9 @@ def select_model(
     if missing:
         raise ValueError(f"Labeled feature table is missing columns: {sorted(missing)}")
     origins = data["data_origin"].astype("string").str.strip().str.lower()
-    if origins.isna().any() or set(origins) != {"real"}:
+    if origins.isna().any() or origins.str.contains("synthetic|dummy", regex=True).any():
         raise ValueError(
-            "Model selection accepts only rows marked data_origin=real; "
+            "Model selection accepts only non-synthetic component outputs; "
             "synthetic fixtures are for pipeline checks, not model selection."
         )
     version_columns = [
@@ -229,7 +240,10 @@ def select_model(
         "is_dummy_data": False,
     }
     if final_model is not None:
-        artifact["logistic_model"] = final_model.__dict__
+        if isinstance(final_model, LogisticModel):
+            artifact["logistic_model"] = final_model.__dict__
+        elif isinstance(final_model, GradientBoostedStumpModel):
+            artifact["gradient_boosting_model"] = final_model.__dict__
     model_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     model_path.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
@@ -268,7 +282,7 @@ def rank_file(
 ) -> pd.DataFrame:
     """Create a high-to-low CVE ranking from a fused score table."""
 
-    frame = pd.read_csv(input_path, dtype={"cve_id": "string"})
+    frame = pd.read_csv(input_path, dtype={"cve_id": "string"}, low_memory=False)
     if "cve_id" not in frame or frame["cve_id"].isna().any():
         raise ValueError("Input must have a non-empty cve_id column")
     if frame["cve_id"].duplicated().any():
@@ -277,11 +291,12 @@ def rank_file(
     if model_path is not None and model_path.is_file():
         artifact = json.loads(model_path.read_text(encoding="utf-8"))
         model_name = artifact["model_name"]
-    fitted = (
-        LogisticModel(**artifact["logistic_model"])
-        if artifact and "logistic_model" in artifact
-        else None
-    )
+    if artifact and "logistic_model" in artifact:
+        fitted = LogisticModel(**artifact["logistic_model"])
+    elif artifact and "gradient_boosting_model" in artifact:
+        fitted = GradientBoostedStumpModel(**artifact["gradient_boosting_model"])
+    else:
+        fitted = None
     scores = score_model(model_name, feature_frame(frame), fitted)
     ranked = frame.copy()
     ranked["risk_score"] = scores
@@ -303,8 +318,7 @@ def rank_file(
 
 def main() -> None:
     settings = load_settings()
-    module_dir = Path(__file__).resolve().parent
-    default_input = module_dir / "dummy_inputs" / "fused_dummy_dataset.csv"
+    default_input = settings.outputs / "d_fusion" / "fused_dataset.csv"
     default_model = settings.data_processed / "d_fusion" / MODEL_FILE
     default_report = settings.outputs / "d_fusion" / REPORT_FILE
     parser = argparse.ArgumentParser(

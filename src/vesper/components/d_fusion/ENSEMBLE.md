@@ -1,7 +1,7 @@
 # Component D ranking and model selection
 
 `ensemble.py` turns the fused CVE table into a high-to-low risk ranking. It
-also compares four candidate approaches when a historical, labeled feature
+also compares five candidate approaches when a historical, labeled feature
 table is available:
 
 - `epss`: EPSS-only reference ranking.
@@ -11,22 +11,24 @@ table is available:
 - `logistic_regression`: class-weighted, L2-regularized logistic regression
   trained on point-in-time component and baseline scores, with training-only
   median imputation, standardization, and missingness indicators.
+- `gradient_boosting`: class-weighted logistic-loss boosting with shallow
+  decision stumps, training-only median imputation, and missingness indicators.
 
-The current 120-row dummy fixture is one decision snapshot and its A/B/C scores
-are synthetic. The generator also excludes current KEV CVEs. It can validate
-the mechanics of sorting and fusion, but it cannot provide a valid training
-target or select the research model. Until real temporal outputs and labels are
-available, `equal_weight` is marked provisional.
+The first-version A/B/C fused data contains one decision snapshot and no future
+KEV outcome labels. It can produce a provisional equal-weight ranking, but it
+cannot train or select the supervised models. Model selection needs multiple
+time-aligned snapshots with mature future KEV labels. Until then,
+`equal_weight` remains the provisional ranking baseline.
 
 ## Produce a current ranking
 
-After generating the fused fixture, run:
+After generating the fused dataset, run:
 
 ```powershell
 uv run python -m vesper.components.d_fusion.ensemble rank
 ```
 
-By default this reads `dummy_inputs/fused_dummy_dataset.csv`, scores using the
+By default this reads `outputs/d_fusion/fused_dataset.csv`, scores using the
 available-signal equal-weight mean, and writes
 `outputs/d_fusion/ranked_vulnerabilities.csv`. Rows are sorted by `risk_score`
 descending and have a one-based `risk_rank`. Use `--input` and `--output` to
@@ -36,6 +38,44 @@ point at other files. To inspect an individual reference ranking:
 uv run python -m vesper.components.d_fusion.ensemble rank --model epss
 uv run python -m vesper.components.d_fusion.ensemble rank --model cvss
 ```
+
+## Fuse a real Component C handoff
+
+Place the final `c_graph_scores.csv` and its matching metadata JSON under
+`data/processed/component_c/`. This generated data directory is gitignored;
+share the handoff using the team's agreed data-sharing location. Run:
+
+```powershell
+uv run python -m vesper.components.d_fusion.fusion
+uv run python -m vesper.components.d_fusion.ensemble rank `
+  --input outputs/d_fusion/fused_dataset.csv `
+  --output outputs/d_fusion/ranked_vulnerabilities.csv `
+  --model equal_weight
+uv run python -m vesper.components.d_fusion.run_knapsack `
+  --ranking outputs/d_fusion/ranked_vulnerabilities.csv `
+  --output outputs/d_fusion/vesper_daily_patch_plan.csv `
+  --patchers 3 --hours-per-patcher 6 --assumed-patch-hours 1
+```
+
+Fusion uses the existing CVSS/EPSS baseline as its candidate universe and
+joins Component A, B, and C inputs by `cve_id`. A/B default to the current
+dummy fixtures; use `--component-a` and `--component-b` to provide handoffs
+from those components. CVEs without a
+component row and rows marked unavailable keep a blank score; they are omitted
+from the available-input mean rather than treated as zero. Per-component source
+dates and statuses are retained in `fused_dataset.csv`. The output is marked
+`mixed_real_c_synthetic_ab` while A/B fixtures remain synthetic, so its ranking
+is for pipeline demonstration and not validated research evaluation.
+
+The final command is only a pipeline demonstration: it assigns the same
+assumed effort to each CVE because the current ranking has no patch-time data.
+The output labels this assumption; replace it with calibrated effort facts
+before interpreting the schedule operationally.
+
+The C metadata snapshot is reported by the fusion command, and its SHA-256 is
+checked against the metadata when supplied. Use `--component-c` to provide a
+handoff at a different path, `--baseline` to select another CVSS/EPSS baseline,
+and `--output` to choose another fused CSV destination.
 
 If a selected-model artifact exists at
 `data/processed/d_fusion/selected_ensemble_model.json`, `rank` uses it by
@@ -49,7 +89,7 @@ Prepare a CSV with one row per `(cve_id, decision_time)` and these columns:
 | Column | Meaning |
 | --- | --- |
 | `cve_id` | Vulnerability key. |
-| `data_origin` | Must be `real`; this prevents model selection from dummy fixtures. |
+| `data_origin` | Must identify a non-synthetic source, such as `first_version_components`; synthetic fixtures are rejected. |
 | `decision_time` | Timestamp when the features would have been known. |
 | `label_matured_at` | Date the future-window outcome is fully known. |
 | `horizon_days` | Forward outcome window, such as 30 days. |
