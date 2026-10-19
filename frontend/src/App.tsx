@@ -1,46 +1,78 @@
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { cn } from '@/lib/utils'
+import { mainNav, pages, type PageId } from '@/pages'
 
-const components = [
-  { id: 'A', name: 'Text risk', output: 'Risk score from the CVE description' },
-  { id: 'B', name: 'Exploit timing', output: 'How soon exploitation is likely' },
-  { id: 'C', name: 'Knowledge graph', output: 'Graph-based risk score' },
-  { id: 'D', name: 'Fusion', output: 'Combined ranking and patch schedule' },
-]
+type NavItemProps = {
+  id: PageId
+  activeId: PageId
+  onSelect: (id: PageId) => void
+  className?: string
+}
+
+// One sidebar link. Used for the main menu and the footer link.
+function NavItem({ id, activeId, onSelect, className }: NavItemProps) {
+  const { title, icon: Icon } = pages[id]
+  const isActive = id === activeId
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      aria-current={isActive ? 'page' : undefined}
+      onClick={() => onSelect(id)}
+      className={cn('justify-start', isActive && 'bg-sidebar-accent', className)}
+    >
+      {Icon && <Icon />}
+      {title}
+    </Button>
+  )
+}
 
 function App() {
-  return (
-    <main className="mx-auto flex min-h-svh max-w-4xl flex-col gap-8 p-8">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">VESPER</h1>
-          <p className="text-muted-foreground">
-            Machine-learning-based prioritisation of software vulnerabilities
-          </p>
-        </div>
-        <Button variant="outline" asChild>
-          <a href="https://github.com/DinithaSasinduDissanayake/VESPER">Repository</a>
-        </Button>
-      </header>
+  const [activeId, setActiveId] = useState<PageId>('queue')
+  const page = pages[activeId]
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        {components.map((component) => (
-          <Card key={component.id}>
-            <CardHeader>
-              <CardTitle>Component {component.id}</CardTitle>
-              <CardDescription>{component.name}</CardDescription>
-            </CardHeader>
-            <CardContent>{component.output}</CardContent>
-          </Card>
-        ))}
-      </section>
-    </main>
+  return (
+    <div className="flex min-h-svh">
+      <aside className="flex w-64 shrink-0 flex-col border-r bg-sidebar">
+        <button
+          type="button"
+          onClick={() => setActiveId('queue')}
+          className="border-b px-4 py-3 text-left"
+        >
+          <span className="block font-semibold">VESPER</span>
+          <span className="block text-xs text-muted-foreground">
+            Vulnerability Evidence Workbench
+          </span>
+        </button>
+
+        <nav aria-label="Main" className="flex flex-1 flex-col gap-1 p-2">
+          {mainNav.map((id) => (
+            <NavItem key={id} id={id} activeId={activeId} onSelect={setActiveId} />
+          ))}
+        </nav>
+
+        <nav aria-label="Help" className="flex flex-col border-t p-2">
+          <NavItem
+            id="scores"
+            activeId={activeId}
+            onSelect={setActiveId}
+            className="text-xs text-muted-foreground"
+          />
+        </nav>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-14 items-center justify-between border-b px-6">
+          <h1 className="text-sm font-semibold">{page.title}</h1>
+          <span className="text-sm text-muted-foreground">Data snapshot: —</span>
+        </header>
+
+        <main className="p-6 text-sm text-muted-foreground">
+          <p>{page.purpose}</p>
+        </main>
+      </div>
+    </div>
   )
 }
 

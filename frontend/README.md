@@ -27,6 +27,13 @@ bunx shadcn@latest add table
 
 Do not copy component files in by hand, and do not add another UI library. This keeps every screen on the same style.
 
+## App structure
+
+- `src/App.tsx`: the layout (sidebar, header) and page switching.
+- `src/pages.tsx`: the list of pages (title, purpose, icon).
+
+To build your page: add your component in `src/components/`, then show it in `App.tsx` in place of the placeholder for your page id.
+
 ## Layout
 
 | Path | Contents |
