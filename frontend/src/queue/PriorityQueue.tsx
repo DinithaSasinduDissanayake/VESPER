@@ -6,24 +6,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import type { Component, QueueItem, Score, ScoreStatus } from './types'
-
-// Words shown when a component gave no number.
-const statusLabels: Record<ScoreStatus, string> = {
-  available: '—',
-  abstained: 'abstained',
-  already_exploited: 'already exploited',
-  not_eligible: 'not eligible',
-}
-
-function findScore(item: QueueItem, component: Component): Score | undefined {
-  return item.scores.find((s) => s.component === component)
-}
-
-// The fused score used for ranking, or null when there is none.
-function fusedScore(item: QueueItem): number | null {
-  return findScore(item, 'd_fusion')?.score ?? null
-}
+import { affectedText, findScore, fusedScore, statusLabels, toPercent } from './format'
+import type { QueueItem, Score } from './types'
 
 // Highest fused score first; items without one go last.
 function rankItems(items: QueueItem[]): QueueItem[] {
@@ -35,11 +19,6 @@ function rankItems(items: QueueItem[]): QueueItem[] {
     if (b === null) return -1
     return b - a
   })
-}
-
-// A 0–1 score shown as a whole number from 0 to 100.
-function toPercent(value: number): string {
-  return Math.round(value * 100).toString()
 }
 
 // One component cell: the score, or a muted word saying why there is none.
@@ -54,7 +33,12 @@ function ScoreCell({ score }: { score: Score | undefined }) {
   )
 }
 
-export function PriorityQueue({ items }: { items: QueueItem[] }) {
+type PriorityQueueProps = {
+  items: QueueItem[]
+  onSelect: (cveId: string) => void
+}
+
+export function PriorityQueue({ items, onSelect }: PriorityQueueProps) {
   return (
     <Table>
       <TableHeader>
@@ -73,14 +57,21 @@ export function PriorityQueue({ items }: { items: QueueItem[] }) {
       </TableHeader>
       <TableBody>
         {rankItems(items).map((item, index) => {
-          const { cve_id, description, cvss_base_score, affected } = item.vulnerability
+          const { cve_id, description, cvss_base_score } = item.vulnerability
           const fused = fusedScore(item)
           return (
-            <TableRow key={cve_id}>
+            // Rows open the detail view by click or by Enter (tabIndex makes them focusable).
+            <TableRow
+              key={cve_id}
+              tabIndex={0}
+              className="cursor-pointer"
+              onClick={() => onSelect(cve_id)}
+              onKeyDown={(e) => e.key === 'Enter' && onSelect(cve_id)}
+            >
               <TableCell>{index + 1}</TableCell>
               <TableCell className="font-mono">{cve_id}</TableCell>
               <TableCell className="whitespace-normal">{description}</TableCell>
-              <TableCell>{affected.map(([vendor, product]) => `${vendor} / ${product}`).join(', ')}</TableCell>
+              <TableCell>{affectedText(item)}</TableCell>
               <TableCell className="text-right font-semibold">
                 {fused === null ? '—' : toPercent(fused)}
               </TableCell>
