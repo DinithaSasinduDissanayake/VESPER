@@ -27,6 +27,18 @@ CUTOFF_DATES = (date(2022, 1, 1), date(2022, 7, 1), date(2023, 1, 1), date(2024,
 # the snapshot date, so that its outcome has had time to be observed.
 MATURITY_DAYS = 365
 
+# The day CISA published the KEV catalogue. It started with a backlog of CVEs
+# that had been exploited earlier, sometimes years earlier. Before this day no
+# CVE could be listed in KEV at all.
+KEV_START_DATE = date(2021, 11, 3)
+
+# The cohorts of the analysis (filter with survival_table.filter_cohort):
+#   full      every study CVE (published from STUDY_START)
+#   post_kev  CVEs published on or after KEV_START_DATE, when a KEV listing was
+#             possible from the publication day. This is the MAIN cohort for
+#             modelling; full is kept as the comparison.
+COHORTS = ("full", "post_kev")
+
 # Component B's own subfolder inside the shared processed-data folder
 # (load_settings().data_processed / PROCESSED_SUBFOLDER)
 PROCESSED_SUBFOLDER = "b_survival"

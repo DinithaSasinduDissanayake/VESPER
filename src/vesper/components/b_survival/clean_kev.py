@@ -19,11 +19,14 @@ Run from anywhere:
 """
 
 import json
-from datetime import date
 
 import pandas as pd
 
-from vesper.components.b_survival.study_design import PROCESSED_SUBFOLDER, SNAPSHOT_DATE
+from vesper.components.b_survival.study_design import (
+    KEV_START_DATE,
+    PROCESSED_SUBFOLDER,
+    SNAPSHOT_DATE,
+)
 from vesper.config import load_settings
 from vesper.contracts.vulnerability import CVE_ID_PATTERN
 
@@ -31,10 +34,9 @@ from vesper.contracts.vulnerability import CVE_ID_PATTERN
 KEV_FILE_NAME = "kev_2026-10-01.json"
 OUTPUT_FILE_NAME = "kev_clean.csv"
 
-# The day CISA published the catalogue. It started with a backlog of CVEs that
-# had been exploited earlier, sometimes years earlier. For those CVEs the date
-# means "the catalogue started", not "exploitation was confirmed on this day".
-KEV_START_DATE = date(2021, 11, 3)
+# KEV_START_DATE (from study_design.py) is the day CISA published the catalogue.
+# For the backlog of CVEs listed that day, the date means "the catalogue
+# started", not "exploitation was confirmed on this day".
 
 # How dates are written in the CSV: ISO 8601 with "Z", which means UTC
 CSV_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
