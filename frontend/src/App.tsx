@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { mainNav, pages, type PageId } from '@/pages'
+import { PriorityQueue } from '@/queue/PriorityQueue'
+import { sampleQueue } from '@/queue/sampleQueue'
 
 type NavItemProps = {
   id: PageId
@@ -68,9 +70,16 @@ function App() {
           <span className="text-sm text-muted-foreground">Data snapshot: —</span>
         </header>
 
-        <main className="p-6 text-sm text-muted-foreground">
-          <p>{page.purpose}</p>
-        </main>
+        {activeId === 'queue' ? (
+          <main className="p-6 text-sm">
+            <p className="mb-4 text-muted-foreground">Sample data — not real model output.</p>
+            <PriorityQueue items={sampleQueue} />
+          </main>
+        ) : (
+          <main className="p-6 text-sm text-muted-foreground">
+            <p>{page.purpose}</p>
+          </main>
+        )}
       </div>
     </div>
   )
