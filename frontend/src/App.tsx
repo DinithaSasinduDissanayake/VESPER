@@ -1,10 +1,21 @@
-import { useState } from 'react'
+import { useState, type ComponentType } from 'react'
+import { AnalysePage } from '@/analyse/AnalysePage'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { mainNav, pages, type PageId } from '@/pages'
-import { CveDetail } from '@/queue/CveDetail'
-import { PriorityQueue } from '@/queue/PriorityQueue'
-import { sampleQueue } from '@/queue/sampleQueue'
+import { ExposurePage } from '@/exposure/ExposurePage'
+import { SprintPlanPage } from '@/plan/SprintPlanPage'
+import { QueuePage } from '@/queue/QueuePage'
+import { ScoresPage } from '@/scores/ScoresPage'
+
+// The component that draws each page.
+const pageComponents: Record<PageId, ComponentType> = {
+  queue: QueuePage,
+  exposure: ExposurePage,
+  sprint: SprintPlanPage,
+  analyse: AnalysePage,
+  scores: ScoresPage,
+}
 
 type NavItemProps = {
   id: PageId
@@ -33,16 +44,10 @@ function NavItem({ id, activeId, onSelect, className }: NavItemProps) {
 
 function App() {
   const [activeId, setActiveId] = useState<PageId>('queue')
-  // The CVE open in the detail view, or null to show the queue list.
-  const [selectedCveId, setSelectedCveId] = useState<string | null>(null)
   const page = pages[activeId]
-  const selectedItem = sampleQueue.find((item) => item.vulnerability.cve_id === selectedCveId)
-
-  // Changing page always closes the detail view.
-  function goTo(id: PageId) {
-    setActiveId(id)
-    setSelectedCveId(null)
-  }
+  const PageComponent = pageComponents[activeId]
+  // Sidebar links and the logo all just switch the page.
+  const goTo = setActiveId
 
   return (
     <div className="flex min-h-svh">
@@ -80,20 +85,10 @@ function App() {
           <span className="text-sm text-muted-foreground">Data snapshot: —</span>
         </header>
 
-        {activeId === 'queue' ? (
-          <main className="p-6 text-sm">
-            <p className="mb-4 text-muted-foreground">Sample data — not real model output.</p>
-            {selectedItem ? (
-              <CveDetail item={selectedItem} onBack={() => setSelectedCveId(null)} />
-            ) : (
-              <PriorityQueue items={sampleQueue} onSelect={setSelectedCveId} />
-            )}
-          </main>
-        ) : (
-          <main className="p-6 text-sm text-muted-foreground">
-            <p>{page.purpose}</p>
-          </main>
-        )}
+        {/* key resets the page's state (e.g. the open CVE) when the page changes. */}
+        <main className="p-6 text-sm">
+          <PageComponent key={activeId} />
+        </main>
       </div>
     </div>
   )
