@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 from datetime import UTC, datetime
@@ -54,7 +55,11 @@ def run_historical_pipeline(
     if not isinstance(history, dict):
         raise ValueError("History file must contain a JSON object")
 
-    relationships = reconstruct_relationships(history, snapshot_at)
+    relationships = reconstruct_relationships(
+        history,
+        snapshot_at,
+        cve_id=history_path.stem,
+    )
     graph = build_historical_graph(relationships)
     features = calculate_graph_features(graph)
 
@@ -68,12 +73,27 @@ def run_historical_pipeline(
         if temporary_path.exists():
             temporary_path.unlink()
 
+    exclusions_path = output_path.with_suffix(".exclusions.csv")
+    exclusions_temp = exclusions_path.with_suffix(exclusions_path.suffix + ".tmp")
+    try:
+        with exclusions_temp.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["cve_id", "reason"])
+            if not relationships.feature_eligible:
+                writer.writerow([relationships.cve_id, ";".join(relationships.exclusion_reasons)])
+        exclusions_temp.replace(exclusions_path)
+    finally:
+        if exclusions_temp.exists():
+            exclusions_temp.unlink()
+
     metadata = {
         "cve_id": relationships.cve_id,
         "snapshot_at": snapshot_at.isoformat(),
         "history_file": str(history_path),
         "history_available": relationships.history_available,
         "history_complete": relationships.history_complete,
+        "feature_eligible": relationships.feature_eligible,
+        "exclusion_reasons": list(relationships.exclusion_reasons),
         "warnings": list(relationships.warnings),
         "reconstructed_affected": [
             {"vendor": vendor, "product": product} for vendor, product in relationships.affected
@@ -82,6 +102,7 @@ def run_historical_pipeline(
         "graph_nodes": graph.number_of_nodes(),
         "graph_edges": graph.number_of_edges(),
         "feature_rows": len(features),
+        "exclusions_csv": str(exclusions_path),
         "output_csv": str(output_path),
         "generated_at_utc": datetime.now(UTC).isoformat(),
     }
