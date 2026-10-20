@@ -51,18 +51,20 @@ backend (src/vesper/contracts/score.py, vulnerability.py)
 
 ### Sprint plan optimiser
 
-The Sprint plan page uses a placeholder (fixed hours per CVE). The real optimiser is
-the knapsack API on the `ComponentD` branch:
+The Sprint plan page is implemented in `src/plan/SprintPlanPage.tsx`. It loads the
+backend ranking and submits capacity and per-CVE overrides through
+`src/api/queue.ts`. The knapsack API is:
 
 `POST /api/d-fusion/knapsack`
 - request: `{ patchers, hours_per_patcher, overrides }`
 - response: `{ used_hours, capacity_hours, scheduled, deferred, ... }`
 
-Capacity is `patchers × hours_per_patcher`. Replace the placeholder with this call.
+Capacity is `patchers × hours_per_patcher`. The page sends the request through
+`src/api/queue.ts` and displays the returned scheduled and deferred candidates.
 
 ## Component D patch planner
 
-The VESPER screen includes a daily patch planner under `src/knapsack/`. Start
+The VESPER screen includes a daily patch planner under `src/plan/SprintPlanPage.tsx`. Start
 the API and frontend in separate terminals from the repository root:
 
 ```powershell
