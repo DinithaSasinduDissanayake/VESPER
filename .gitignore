@@ -10,8 +10,8 @@ __pycache__/
 !.env.example
 
 # Downloaded data and generated results
-data/
-outputs/
+/data/
+/outputs/
 
 # Logs and generated output
 *.log
