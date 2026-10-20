@@ -1,5 +1,67 @@
 # Component C final implementation and research handoff
 
+## Historical abstention panel
+
+`scripts/export_c_graph_historical_panel.py` exports a separate historical panel
+using the full validated research manifest as its master population. The fixed
+grid is the first of each month from 2023-01-01 through 2026-09-01, excluding
+2024-12-01: 44 decisions at 00:00:00 UTC. Publication and history events use
+inclusive `<= decision_time` cutoffs. The expected row count is calculated from
+the actual manifest count times 44, never from a hard-coded population size.
+
+This release is **abstention-only**. Every master CVE has a row at every cutoff,
+with blank `score`, `status=abstained`, and a specific primary reason. CVEs not
+yet published remain explicit as `cve_not_published_at_decision_time`; they do
+not enter graph or percentile populations. No graph, PageRank, percentile,
+KEV label, current-score import, or temporal backfill is performed. Current
+`c_graph_scores.csv`, provider, graph and disagreement outputs are unchanged.
+
+The exact shared 11-column Score contract is retained. Historical model version
+is `c_graph-pagerank-percentile-historical-structural-0.1`, distinct from the
+current adapter. `score_kind=ranking_score`; `horizon_days=30` is downstream
+evaluation metadata, not evidence of 30-day exploitation training or prediction.
+`trained_through` stays blank because C has no supervised training dataset.
+
+Strict replay is reused only to diagnose evidence. Technical eligibility does
+not certify historical public availability or sufficient graph context. The
+audited local corpus has 499 unique CVEs; the strict policy has some eligible
+CVEs at 41 decisions and none at July, August or September 2026. These are audit
+observations, not hard-coded export counts. All 44 dates lack certified numerical
+score support. Mutable Affected links, uncertain initial states, incomplete
+coverage and assumed UTC event timestamps remain explicit limitations.
+
+The exporter streams rows and validates them through a second streaming read.
+It refuses existing destination directories. Its two artifacts are
+`c_graph_historical_scores.csv` and
+`c_graph_historical_scores.csv.metadata.json`. Metadata contains manifest and
+source hashes, publication coverage, duplicate-copy policy, per-cutoff technical
+eligibility, primary and complete reason counts, and keyed history diagnostics.
+Duplicate copies are compared at each cutoff; material state disagreements fail
+closed. Invalid copies also fail closed rather than being silently discarded.
+Specific reconstruction reasons take precedence over general scientific gates;
+the documented ordered policy prefers `github_reference_unrecoverable` over its
+broader unsupported-Affected diagnosis. Full concurrent reasons are retained.
+
+Only the manifest, cached local history and reconstruction code are needed.
+Use repeatable `--history-dir` arguments to cover all approved local corpora:
+
+```powershell
+$env:PYTHONPATH = Join-Path (Get-Location) 'src'
+python -B scripts/export_c_graph_historical_panel.py `
+  --manifest <research_population.csv> `
+  --history-dir <existing-history-directory> `
+  --output-dir outputs/NEW_HISTORICAL_ABSTENTION_PANEL `
+  --start 2023-01-01 --end 2026-09-01 --exclude-date 2024-12-01 `
+  --cutoff-time 00:00:00Z --horizon-days 30 --mode abstention-only
+```
+
+No numerical score is absent accidentally. Historical numerical release requires
+independently defensible initial states and public-availability timing,
+immutable Affected payloads or revisions, and an agreed sufficient graph-context
+population. A new reviewed evidence policy and numerical adapter would be needed;
+this exporter has no numerical mode. Abstention rows are an auditable missingness
+handoff, not a certified historical predictor or a comparison against CVSS/EPSS.
+
 ## Minimal PR scope and archived references
 
 The final executable pipeline covers the current-snapshot graph, detailed

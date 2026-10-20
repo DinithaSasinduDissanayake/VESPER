@@ -1,5 +1,30 @@
 # Component C Feature Provider Schema and Component D Handoff
 
+## Separate historical abstention panel
+
+The current feature provider and latest percentile adapter remain unchanged.
+The separate `scripts/export_c_graph_historical_panel.py` export uses the full
+research manifest times 44 monthly UTC-midnight decisions, 2023-01-01 through
+2026-09-01 excluding 2024-12-01. It preserves the shared 11 Score columns and
+one `(cve_id, decision_time)` row even when the CVE is unpublished or history is
+missing. Every score is intentionally blank and every status is `abstained`.
+Not-yet-published rows use `cve_not_published_at_decision_time` and do not enter
+any graph or percentile population. No current or later score is backfilled.
+
+This is not a historical feature provider containing numerical graph features.
+Strict relationship replay supplies specific diagnoses only; incomplete graph
+context and unverified historical public availability prevent certified scores.
+No graph or scoring calculation occurs. `horizon_days=30` is downstream evaluation
+metadata, not a trained exploitation target; `trained_through` remains blank.
+Historical rows use `c_graph-pagerank-percentile-historical-structural-0.1`.
+
+The streamed CSV and adjacent `.csv.metadata.json` preserve source/manifest
+identity, per-cutoff coverage, all concurrent diagnoses and deterministic primary
+reason precedence. See [historical panel handoff](COMPONENT_C_HANDOFF.md#historical-abstention-panel)
+for CLI, source conflict rules, and evidence required before numerical historical
+scores could be released. Current provider evidence must never be used to fill
+this panel's historical missing values.
+
 ## Minimal PR scope and archived references
 
 The final executable pipeline covers the current-snapshot graph, detailed
