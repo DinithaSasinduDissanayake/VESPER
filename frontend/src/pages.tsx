@@ -20,7 +20,7 @@ export const pages: Record<PageId, Page> = {
     icon: ListChecks,
   },
   exposure: {
-    title: 'Exposure',
+    title: 'Structural Relationships',
     icon: Radar,
   },
   sprint: {
