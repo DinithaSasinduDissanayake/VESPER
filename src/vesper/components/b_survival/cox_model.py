@@ -10,7 +10,8 @@ Models fitted on each TRAIN set (see features.py for the inputs):
                the reference for the Brier score: a model must beat "no features".
 
 The Cox models use a small ridge penalty (PENALIZER = 0.01). Some train sets have
-very few events (5 in post_kev 2022-01-01) and several dummies are rare, so a
+very few events (fewer than split_data.MIN_TRAIN_EVENTS at the earliest post_kev
+cut-offs; the counts are in split_summary.csv) and several dummies are rare, so a
 coefficient can run off to infinity when a dummy has no events. The penalty keeps
 every coefficient finite and stable while hardly changing the well-supported
 ones. Because of it, the confidence intervals are approximate.
