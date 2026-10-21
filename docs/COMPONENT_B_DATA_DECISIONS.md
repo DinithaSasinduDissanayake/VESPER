@@ -517,6 +517,45 @@ cohort: lifelines needs more than 10 minutes for its 147,000 train rows
   is not done yet; it is the comparison the research question asks for.
 - A paired bootstrap of the difference between `cox` and `cvss_rank` (the same
   resamples are already used for both) would test the difference directly.
+## 16. Score export to Component D
+
+**What I did.** `score_export` writes one shared `Score` record per CVE to
+`outputs/b_survival/b_exploit_timing_scores.csv`, the file Component D reads.
+The numbers below are printed by `score_export`.
+
+**Model and times.** The Cox model of section 15, fitted with the same rules:
+post_kev CVEs published before `trained_through`, re-censored at that day, CVEs
+without CVSS left out. By default `trained_through` = `decision_time` = 00:00
+UTC on the snapshot date (2026-10-01): train 208,290 rows, 788 events.
+`model_version` is `b_survival-cox-<trained_through>-0.1`.
+
+**Horizon.** 30 days (`HORIZON_DAYS`), the same as D's fusion.
+
+**Score.** For a CVE that is `age` days old at the decision time and still
+unlisted, the score is the model's "listed in KEV within the next 30 days":
+1 - S(age + 30 | x) / S(age | x). The plain 1 - S(30 | x) would treat a
+three-year-old CVE as if it were published today. `score_kind` is
+`ranking_score`, because the calibration of this estimate has not been checked
+on held-out data.
+
+**Statuses, in this order.**
+
+| Status | Rule | Rows |
+|---|---|---:|
+| already_exploited | KEV day before the decision day | 1,534 |
+| not_eligible | published before KEV_START_DATE (outside post_kev) | 89,401 |
+| abstained | no CVSS 3.x score | 9,745 |
+| abstained | age + 30 days is past the longest train follow-up (not extrapolated) | 1,453 |
+| available | scored | 206,049 |
+
+**Score distribution (available rows).** Median 0.00003, 90th percentile
+0.00026, 99th percentile 0.00079, maximum 0.00233, mean 0.00010. The values are
+small because a KEV listing within 30 days is rare: 788 events in 208,290
+train CVEs over up to about five years.
+
+**How to check.** `uv run python -m vesper.components.b_survival.score_export`
+prints the model, the rows per status and the score distribution.
+
 ## How to check
 
 Run from the repository root. Each command prints the report that the numbers

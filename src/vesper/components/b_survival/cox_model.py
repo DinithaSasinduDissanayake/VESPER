@@ -79,6 +79,30 @@ class CoxModel:
         survival = self.fitter.predict_survival_function(self.features(rows), times=horizons)
         return 1 - survival.to_numpy().T
 
+    def listed_within_next(self, rows, ages, days):
+        """Model estimate of "listed in the next `days` days" for CVEs `ages` days old
+        and still unlisted: 1 - S(age + days | x) / S(age | x).
+
+        Uses S(t | x) = S0(t) ** exp(x·beta), with lifelines' baseline S0 (both are
+        centred the same way). NaN where S(age | x) is 0.
+        """
+        partial = self.fitter.predict_partial_hazard(self.features(rows)).to_numpy()
+        ages = np.asarray(ages, dtype=float)
+        baseline_now = baseline_survival_at(self.fitter, ages)
+        baseline_later = baseline_survival_at(self.fitter, ages + days)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ratio = np.where(baseline_now > 0, baseline_later / baseline_now, np.nan)
+        return 1 - ratio**partial
+
+
+def baseline_survival_at(fitter, times):
+    """Baseline survival step curve S0 at `times` (1 before the first event time)."""
+    curve = fitter.baseline_survival_
+    timeline = curve.index.to_numpy(dtype=float)
+    values = curve.iloc[:, 0].to_numpy()
+    position = np.searchsorted(timeline, np.asarray(times, dtype=float), side="right") - 1
+    return np.where(position >= 0, values[np.clip(position, 0, None)], 1.0)
+
 
 def fit_cox(train, encoder=None, feature_columns=None, name="cox"):
     """Fit a Cox model on train rows (which must all have a CVSS score)."""
