@@ -2,7 +2,7 @@
 
 This file records the decisions made while cleaning the data, and the reason
 for each one. Every number was printed by a cleaning module on the raw files
-described in `data_snapshot.md` (snapshot date 2026-10-01). "How to check" at
+described in [COMPONENT_B_DATA_SNAPSHOT.md](COMPONENT_B_DATA_SNAPSHOT.md) (snapshot date 2026-10-01). "How to check" at
 the end gives the commands.
 
 ## 1. The study starts in 2016, not 2015
@@ -65,7 +65,7 @@ limit cannot be removed, only stated.
 ## 4. 3,355 CVEs were edited by NVD after the snapshot date
 
 **What I found.** The snapshot date is 2026-10-01, but 141 of the 142 NVD
-files were downloaded on 2026-10-06 (see `data_snapshot.md`). Records that NVD
+files were downloaded on 2026-10-06 (see [COMPONENT_B_DATA_SNAPSHOT.md](COMPONENT_B_DATA_SNAPSHOT.md)). Records that NVD
 edited between those days may hold values from after the snapshot.
 
 **The number.** 3,355 of the 316,477 CVEs kept have a last-modified date after
@@ -551,3 +551,25 @@ uv run python -m vesper.components.b_survival.evaluate
   `kaplan_meier`.
 - Decision 15: the table and the "left out without CVSS" and "censoring G(365)"
   lines printed by `evaluate`; hazard_ratios.csv and ph_check.csv.
+
+## Possible move to vesper.eval
+
+CONTRIBUTING.md asks that results come from the shared code in `vesper.eval`,
+so that every component is measured the same way. `src/vesper/eval/` is still
+empty, so Component B's metrics live in `b_survival/evaluate.py`. Nothing has
+been moved yet. These functions have no Component B logic and could move to
+`vesper.eval` once the team agrees:
+
+- `c_index_fast`: Harrell's c-index, the same definition as lifelines, fast
+  enough for the bootstrap.
+- `brier_ipcw`, with `censoring_survival` and `km_value`: the Brier score at
+  day t with inverse probability of censoring weights (Graf et al. 1999).
+- `precision_at_k`: precision of the top k, with ties at the k-th place shared
+  out evenly.
+- `bootstrap_metrics`: 95% percentile intervals with the same resamples for
+  every model, so models can be compared.
+- `add_brier_skill`: Brier skill against the Kaplan-Meier reference of the
+  same split.
+
+`listed_within` and the per-split code (`evaluate_split`, `run_split`, `main`)
+are specific to Component B and would stay in `b_survival`.
