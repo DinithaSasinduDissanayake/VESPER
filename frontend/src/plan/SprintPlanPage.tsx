@@ -290,8 +290,8 @@ export function SprintPlanPage() {
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant={view === 'ranking' ? 'secondary' : 'outline'} onClick={() => { setView('ranking'); setPage(0) }}>Ranking</Button>
-              <Button size="sm" variant={view === 'plan' ? 'secondary' : 'outline'} onClick={() => setView('plan')} disabled={!plan}>Patch plan</Button>
+              <Button variant={view === 'ranking' ? 'secondary' : 'outline'} onClick={() => { setView('ranking'); setPage(0) }}>Ranking</Button>
+              <Button variant={view === 'plan' ? 'secondary' : 'outline'} onClick={() => setView('plan')} disabled={!plan}>Patch plan</Button>
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
@@ -362,8 +362,7 @@ export function SprintPlanPage() {
                           <TableCell>
                             {view === 'ranking' ? (
                               <NativeSelect
-                                size="sm"
-                                className="w-28"
+                                className="w-32"
                                 aria-label={`Business criticality for ${item.cve_id}`}
                                 value={criticality}
                                 onChange={(event) => setOverrides((current) => ({
@@ -380,7 +379,7 @@ export function SprintPlanPage() {
                           <TableCell title={item.patch_hours_method ?? undefined}>
                             {view === 'ranking' ? (
                               <Input
-                                className="h-7 w-24"
+                                className="w-24"
                                 type="number"
                                 min={0.25}
                                 max={1000}
@@ -408,9 +407,9 @@ export function SprintPlanPage() {
             <div className="flex items-center justify-between border-t pt-3 text-sm text-muted-foreground">
               <span>{filteredRows.length ? `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, filteredRows.length)}` : '0'} of {filteredRows.length.toLocaleString()} CVEs</span>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((current) => current - 1)}>Previous</Button>
+                <Button variant="outline" disabled={page === 0} onClick={() => setPage((current) => current - 1)}>Previous</Button>
                 <span>{page + 1} / {totalPages}</span>
-                <Button size="sm" variant="outline" disabled={page + 1 >= totalPages} onClick={() => setPage((current) => current + 1)}>Next</Button>
+                <Button variant="outline" disabled={page + 1 >= totalPages} onClick={() => setPage((current) => current + 1)}>Next</Button>
               </div>
             </div>
           </CardContent>

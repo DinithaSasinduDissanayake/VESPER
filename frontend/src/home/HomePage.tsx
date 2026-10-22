@@ -159,7 +159,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
               <p className="text-base text-muted-foreground">{detail}</p>
             </CardContent>
             <CardFooter>
-              <Button variant="outline" size="sm" onClick={() => onNavigate(page)}>
+              <Button variant="outline" onClick={() => onNavigate(page)}>
                 {action} <ArrowRight data-icon="inline-end" />
               </Button>
             </CardFooter>
@@ -216,7 +216,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
             )}
           </CardContent>
           <CardFooter>
-            <Button variant="outline" size="sm" onClick={() => onNavigate('queue')}>
+            <Button variant="outline" onClick={() => onNavigate('queue')}>
               See full priority queue <ArrowRight data-icon="inline-end" />
             </Button>
           </CardFooter>

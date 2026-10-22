@@ -220,7 +220,7 @@ export function CveDetail({ candidate, onBack }: CveDetailProps) {
 
   return (
     <div className="flex flex-col gap-5">
-      <Button variant="outline" size="sm" className="self-start" onClick={onBack}>
+      <Button variant="outline" className="self-start" onClick={onBack}>
         <ArrowLeft data-icon="inline-start" /> Back to priority queue
       </Button>
 
