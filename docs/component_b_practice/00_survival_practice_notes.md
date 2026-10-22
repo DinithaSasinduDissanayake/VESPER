@@ -1,4 +1,4 @@
-<!-- Explanations for notebooks/00_survival_practice.ipynb (the notebook holds the code only). -->
+<!-- Explanations for 00_survival_practice.ipynb (the notebook holds the code only). -->
 
 # 00 — Survival analysis practice (toy dataset)
 

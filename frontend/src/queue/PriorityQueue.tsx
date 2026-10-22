@@ -50,7 +50,7 @@ export function PriorityQueue({ items, onSelect }: PriorityQueueProps) {
           <TableHead className="text-right">Priority</TableHead>
           <TableHead className="text-right">Text</TableHead>
           <TableHead className="text-right">Timing</TableHead>
-          <TableHead className="text-right">Exposure</TableHead>
+          <TableHead className="text-right">Structural percentile</TableHead>
           <TableHead className="text-right">CVSS</TableHead>
           <TableHead className="text-right">EPSS</TableHead>
         </TableRow>

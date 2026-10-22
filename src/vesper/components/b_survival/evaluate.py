@@ -16,7 +16,13 @@ set:
             CVSS score has many ties.
 
 Every metric has a 95% bootstrap interval: N_BOOTSTRAP resamples of the test
-set with a fixed seed, the same resamples for every model.
+set with a fixed seed, the same resamples for every model. The difference in
+c-index between two models (C_INDEX_PAIRS, Cox minus CVSS) is bootstrapped on
+those same resamples (paired), so its interval tests the difference directly.
+
+Brier scores are given for the Cox model with its piecewise-constant baseline
+(cox) and with lifelines' step baseline (cox_breslow), to compare the two
+baselines; both rank the CVEs the same way.
 
 Censoring weights: the censoring distribution G is a Kaplan-Meier of the
 censoring times of the TEST set being evaluated, as in Graf et al. It is NOT
@@ -31,6 +37,7 @@ numbers left out are printed.
 
 Input:   data/processed/b_survival/splits/<cohort>/train_<cut-off>.csv, test_<cut-off>.csv
 Output:  outputs/b_survival/models/metrics.csv
+         outputs/b_survival/models/c_index_differences.csv  (paired, every split)
          outputs/b_survival/models/hazard_ratios.csv   (latest cut-off, both cohorts)
          outputs/b_survival/models/ph_check.csv        (latest cut-off, both cohorts)
 
@@ -65,6 +72,8 @@ TOP_K = 100
 LABEL_DAYS = 365  # P@100 counts a CVE as positive if it was listed within this many days
 N_BOOTSTRAP = 1000
 SEED = 20261001
+# Paired c-index differences: (model, compared with)
+C_INDEX_PAIRS = (("cox", "cvss_rank"),)
 
 # The proportional-hazards check runs on the latest cut-off of these cohorts.
 # lifelines' Schoenfeld test grows with rows x distinct times: about 2.5 minutes
@@ -219,6 +228,28 @@ def bootstrap_metrics(time, event, model_predictions, n_resamples=N_BOOTSTRAP, s
     return intervals
 
 
+def bootstrap_c_index_difference(time, event, risk_a, risk_b, n_resamples=N_BOOTSTRAP, seed=SEED):
+    """c-index(a) - c-index(b), with a 95% percentile interval.
+
+    The resamples are drawn exactly as in bootstrap_metrics (same seed, same
+    order), so they are the same resamples as the intervals of each model.
+    Returns (difference on the full test set, lower, upper).
+    """
+    rng = np.random.default_rng(seed)
+    time, event = np.asarray(time), np.asarray(event)
+    risk_a, risk_b = np.asarray(risk_a, dtype=float), np.asarray(risk_b, dtype=float)
+    samples = []
+    for _ in range(n_resamples):
+        rows = rng.integers(0, len(time), len(time))
+        samples.append(
+            c_index_fast(time[rows], event[rows], risk_a[rows])
+            - c_index_fast(time[rows], event[rows], risk_b[rows])
+        )
+    point = c_index_fast(time, event, risk_a) - c_index_fast(time, event, risk_b)
+    lower, upper = np.nanpercentile(samples, [2.5, 97.5])
+    return float(point), float(lower), float(upper)
+
+
 # ---------------------------------------------------------------------------
 # Main program
 # ---------------------------------------------------------------------------
@@ -227,7 +258,8 @@ def bootstrap_metrics(time, event, model_predictions, n_resamples=N_BOOTSTRAP, s
 def evaluate_split(train, test, cohort, cutoff, n_resamples=N_BOOTSTRAP, log=print):
     """Fit the models on one train set, measure them on its test set.
 
-    Returns the metric rows, the fitted models and the train rows used.
+    Returns the metric rows, the fitted models, the train rows used and the rows
+    of paired c-index differences.
     """
     train, train_left_out = drop_missing_cvss(train)
     test, test_left_out = drop_missing_cvss(test)
@@ -278,7 +310,25 @@ def evaluate_split(train, test, cohort, cutoff, n_resamples=N_BOOTSTRAP, log=pri
             str(days) for days in HORIZONS if days > train_max and listed_by is not None
         )
         rows.append(row)
-    return rows, models, train
+
+    differences = []
+    for name_a, name_b in C_INDEX_PAIRS:
+        point, lower, upper = bootstrap_c_index_difference(
+            time, event, model_predictions[name_a][0], model_predictions[name_b][0], n_resamples
+        )
+        differences.append(
+            {
+                "cohort": cohort,
+                "cutoff": cutoff.isoformat(),
+                "model": name_a,
+                "compared_with": name_b,
+                "c_index_difference": point,
+                "ci_lower": lower,
+                "ci_upper": upper,
+                "excludes_zero": bool(lower > 0 or upper < 0),
+            }
+        )
+    return rows, models, train, differences
 
 
 def add_brier_skill(metrics):
@@ -318,12 +368,25 @@ def print_metrics(metrics):
     print("* a horizon is longer than the longest train follow-up: the estimate is extrapolated")
 
 
+def print_differences(differences):
+    """Print the paired c-index differences with their 95% intervals."""
+    print()
+    print("Paired c-index difference (same bootstrap resamples)")
+    for row in differences.itertuples():
+        verdict = "excludes 0" if row.excludes_zero else "includes 0"
+        print(
+            f"  {row.cohort:<9}{row.cutoff:<12}{row.model} - {row.compared_with}: "
+            f"{row.c_index_difference:+.3f} ({row.ci_lower:+.3f} to {row.ci_upper:+.3f}), "
+            f"{verdict}"
+        )
+
+
 def run_split(splits_dir, cohort, cutoff, latest, n_resamples):
     """Everything for one split; runs in its own process. Returns tables and log lines."""
     lines = []
     train = load_survival_table(splits_dir / cohort / f"train_{cutoff.isoformat()}.csv")
     test = load_survival_table(splits_dir / cohort / f"test_{cutoff.isoformat()}.csv")
-    rows, models, train_used = evaluate_split(
+    rows, models, train_used, differences = evaluate_split(
         train, test, cohort, cutoff, n_resamples, log=lines.append
     )
     ratio_tables, ph_tables = [], []
@@ -342,7 +405,7 @@ def run_split(splits_dir, cohort, cutoff, latest, n_resamples):
             ph_tables.append(check)
         else:
             lines.append(f"  [{cohort} {cutoff}] PH check not run (see PH_CHECK_COHORTS)")
-    return rows, ratio_tables, ph_tables, lines
+    return rows, ratio_tables, ph_tables, lines, differences
 
 
 def main(
@@ -372,22 +435,29 @@ def main(
         with ProcessPoolExecutor(max_workers=workers) as pool:
             results = list(pool.map(run_split, *zip(*jobs, strict=True)))
 
-    metric_rows, ratio_tables, ph_tables = [], [], []
-    for rows, ratios, checks, lines in results:
+    metric_rows, ratio_tables, ph_tables, difference_rows = [], [], [], []
+    for rows, ratios, checks, lines, differences in results:
         for line in lines:
             print(line)
         metric_rows += rows
         ratio_tables += ratios
         ph_tables += checks
+        difference_rows += differences
 
     metrics = add_brier_skill(pd.DataFrame(metric_rows))
     metrics.to_csv(output_dir / "metrics.csv", index=False)
     pd.concat(ratio_tables).to_csv(output_dir / "hazard_ratios.csv", index=False)
     if ph_tables:
         pd.concat(ph_tables).to_csv(output_dir / "ph_check.csv", index=False)
+    differences = pd.DataFrame(difference_rows)
+    differences.to_csv(output_dir / "c_index_differences.csv", index=False)
     print_metrics(metrics)
+    print_differences(differences)
     print()
-    print("Saved metrics.csv, hazard_ratios.csv and ph_check.csv to:", output_dir)
+    print(
+        "Saved metrics.csv, c_index_differences.csv, hazard_ratios.csv and ph_check.csv to:",
+        output_dir,
+    )
     return output_dir
 
 
