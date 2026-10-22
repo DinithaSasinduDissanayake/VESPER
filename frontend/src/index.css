@@ -151,12 +151,3 @@
     @apply font-sans;
     }
 }
-
-@layer utilities {
-  .queue-hero-pattern {
-    background-image:
-      radial-gradient(circle at 82% 25%, oklch(0.82 0.12 210 / 22%), transparent 12rem),
-      radial-gradient(circle at 94% 90%, oklch(0.78 0.12 250 / 18%), transparent 16rem),
-      linear-gradient(115deg, oklch(0.25 0.08 260), oklch(0.36 0.15 255) 62%, oklch(0.32 0.12 235));
-  }
-}
