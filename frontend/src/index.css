@@ -91,7 +91,7 @@
     --stream-timing: oklch(0.72 0.15 70);
     --stream-structure: var(--structural);
     --stream-ranking: oklch(0.6 0.2 350);
-    --surface: oklch(0.982 0.005 277);
+    --surface: oklch(0.976 0.007 277);
     --surface-foreground: oklch(0.17 0.012 275);
     --chart-1: oklch(0.51 0.22 277);
     --chart-2: oklch(0.62 0.12 190);
@@ -166,4 +166,15 @@
     /* 17px base: the nova scale reads small on a data-heavy screen. */
     font-size: 106.25%;
     }
+}
+
+@layer components {
+  /* A soft lift so white cards read against the tinted surface. */
+  [data-slot="card"] {
+    @apply shadow-[0_1px_2px_oklch(0.25_0.03_277/0.05),0_8px_24px_-16px_oklch(0.25_0.03_277/0.18)];
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
 }
