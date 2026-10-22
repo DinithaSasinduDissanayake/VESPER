@@ -52,8 +52,8 @@ function App() {
   const goTo = setActiveId
 
   return (
-    <div className="flex min-h-svh">
-      <aside className="flex w-64 shrink-0 flex-col border-r bg-sidebar">
+    <div className="flex min-h-svh flex-col md:flex-row">
+      <aside className="flex w-full shrink-0 flex-col border-b bg-sidebar md:w-64 md:border-r md:border-b-0">
         <button
           type="button"
           onClick={() => goTo('queue')}
@@ -65,7 +65,7 @@ function App() {
           </span>
         </button>
 
-        <nav aria-label="Main" className="flex flex-1 flex-col gap-1 p-2">
+        <nav aria-label="Main" className="flex flex-1 flex-wrap gap-1 p-2 md:flex-col md:flex-nowrap">
           {mainNav.map((id) => (
             <NavItem key={id} id={id} activeId={activeId} onSelect={goTo} />
           ))}
@@ -88,7 +88,7 @@ function App() {
         </header>
 
         {/* key resets the page's state (e.g. the open CVE) when the page changes. */}
-        <main className="p-6 text-sm">
+        <main className="min-w-0 p-3 text-sm sm:p-6">
           <PageComponent key={activeId} />
         </main>
       </div>

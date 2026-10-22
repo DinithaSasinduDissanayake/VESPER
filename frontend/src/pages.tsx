@@ -25,7 +25,7 @@ export const pages: Record<PageId, Page> = {
     icon: Timer,
   },
   exposure: {
-    title: 'Exposure',
+    title: 'Structural Relationships',
     icon: Radar,
   },
   sprint: {

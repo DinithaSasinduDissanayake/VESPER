@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { TextSection } from '@/analyse/TextSection'
 import { ExposureSection } from '@/exposure/ExposureSection'
+import { structuralStateForQueueItem } from '@/exposure/sampleStructuralDetails'
 import { FusionSection } from '@/plan/FusionSection'
 import { TimingSection } from '@/timing/TimingSection'
 import { affectedText, fusedScore, toPercent } from './format'
@@ -33,7 +34,7 @@ export function CveDetail({ item, onBack }: CveDetailProps) {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <TextSection item={item} />
         <TimingSection item={item} />
-        <ExposureSection item={item} />
+        <div className="min-w-0 md:col-span-2"><ExposureSection resource={structuralStateForQueueItem(item)} /></div>
         <FusionSection item={item} />
       </div>
     </div>
