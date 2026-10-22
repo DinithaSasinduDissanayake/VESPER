@@ -58,7 +58,7 @@ function RankingRows({ candidates, onSelect }: { candidates: PlannerCandidate[];
             <TableCell>
               <button
                 type="button"
-                className="rounded-sm font-mono font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="rounded-sm font-mono font-medium underline decoration-muted-foreground/40 underline-offset-4 outline-none hover:decoration-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
                 onClick={() => onSelect(candidate.cve_id)}
                 aria-label={`Open details for ${candidate.cve_id}`}
               >
