@@ -553,8 +553,36 @@ on held-out data.
 small because a KEV listing within 30 days is rare: 788 events in 208,290
 train CVEs over up to about five years.
 
+**Two files: raw estimate and percentile.** The raw estimates are about
+1e-4, while D's fusion takes a plain mean of 0-1 inputs (normalised CVSS,
+EPSS, A, B, C). Raw B scores would pull every mean down and hardly change the
+order, so B would not count fairly. B therefore follows Component C's pattern
+and writes two files with the same CVEs, statuses and reasons:
+
+- `b_exploit_timing_probability.csv`: the raw 30-day estimate,
+  `model_version` `b_survival-cox-2026-10-01-0.1`. Its `score_kind` stays
+  `ranking_score`, because its calibration is not validated.
+- `b_exploit_timing_scores.csv` (the file D reads): the percentile rank of the
+  raw estimate among the 206,049 available CVEs only, rank / N with tied CVEs
+  sharing the average rank, so it is in (0, 1]. `model_version`
+  `b_survival-cox-percentile-2026-10-01-0.1`. Its metadata names the raw file
+  and model it came from.
+
+Reason: same scale as C, so D's mean is fair. One difference from C: C uses
+(rank - 1) / (N - 1), in [0, 1]; B uses rank / N, in (0, 1], so no available
+CVE gets exactly 0.
+
+**Limitation: raw estimates of exactly 0.** 35,525 of the 206,049 available
+CVEs (17.2%) have a raw estimate of exactly 0, all tied at percentile 0.086.
+The Cox baseline survival S0 is a step function that only drops on days when
+a train CVE was listed. For older CVEs there are 30-day stretches of age with
+no train listing, so S0 is flat there and the estimate is 0. The true chance is
+small but not 0. A smoothed baseline hazard would fix this; it is not done yet.
+
 **How to check.** `uv run python -m vesper.components.b_survival.score_export`
-prints the model, the rows per status and the score distribution.
+prints the model, the rows per status and the raw score distribution. The
+percentile distribution is in `b_exploit_timing_scores.csv.metadata.json`
+(min 0.086, median 0.500, max 1.0).
 
 ## How to check
 

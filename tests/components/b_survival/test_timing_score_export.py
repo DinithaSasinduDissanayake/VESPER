@@ -14,12 +14,16 @@ import pytest
 from vesper.components.b_survival.cox_model import fit_cox
 from vesper.components.b_survival.score_export import (
     HORIZON_DAYS,
+    PERCENTILE_SEMANTICS,
+    RAW_SEMANTICS,
     SCORE_COLUMNS,
     build_timing_scores,
-    export_timing_scores,
+    export_scores,
     fit_scoring_model,
     main,
     model_version,
+    percentile_ranks,
+    percentile_scores,
     start_of_day,
 )
 from vesper.components.b_survival.survival_table import OUTPUT_COLUMNS
@@ -226,13 +230,43 @@ def test_the_scoring_model_sees_nothing_from_after_trained_through(table):
     assert model_version(cutoff) == "b_survival-cox-2023-01-01-0.1"
 
 
-# --- The file for Component D -----------------------------------------------------
+# --- Percentile scores ----------------------------------------------------------
+
+
+def test_percentile_ranks_are_in_zero_one_and_ties_share_the_average_rank():
+    ranks = percentile_ranks([0.2, 0.1, 0.2, 0.4])
+
+    assert ranks.tolist() == pytest.approx([0.625, 0.25, 0.625, 1.0])
+    assert ranks.min() > 0
+
+
+def test_percentile_scores_keep_ids_statuses_and_reasons(records):
+    ranked = percentile_scores(records, DECISION)
+
+    for raw, new in zip(records, ranked, strict=True):
+        assert (new.cve_id, new.status, new.reason) == (raw.cve_id, raw.status, raw.reason)
+        assert (new.score is None) == (raw.score is None)
+        assert new.model_version == "b_survival-cox-percentile-2024-06-01-0.1"
+
+
+def test_percentile_order_equals_raw_order(records):
+    ranked = percentile_scores(records, DECISION)
+
+    raw = np.array([r.score for r in records if r.score is not None])
+    new = np.array([r.score for r in ranked if r.score is not None])
+    # Every pair is in the same order, and equal raw values get equal percentiles
+    assert (np.sign(raw[:, None] - raw[None, :]) == np.sign(new[:, None] - new[None, :])).all()
+    assert new.max() == pytest.approx(1.0)
+    assert 0 < new.min()
+
+
+# --- The files for Component D ----------------------------------------------------
 
 
 def test_the_file_has_d_columns_and_passes_d_checks(records, model, tmp_path):
     path = tmp_path / "b_exploit_timing_scores.csv"
 
-    counts = export_timing_scores(records, path, model)
+    counts = export_scores(percentile_scores(records, DECISION), path, model, PERCENTILE_SEMANTICS)
 
     frame = _read_component(path, "b_survival")
     assert list(pd.read_csv(path).columns) == SCORE_COLUMNS
@@ -245,16 +279,52 @@ def test_the_file_has_d_columns_and_passes_d_checks(records, model, tmp_path):
     assert (parsed == pd.Timestamp(DECISION)).all()
 
 
-def test_main_writes_the_file_in_outputs(table, tmp_path):
-    settings = load_settings(tmp_path)
+def test_the_raw_file_also_passes_d_checks(records, model, tmp_path):
+    path = tmp_path / "b_exploit_timing_probability.csv"
+
+    export_scores(records, path, model, RAW_SEMANTICS)
+
+    assert len(_read_component(path, "b_survival")) == len(records)
+
+
+def write_table(table, settings):
     folder = settings.data_processed / "b_survival"
     folder.mkdir(parents=True)
     saved = table.copy()
     saved["exploit_first_date"] = saved["exploit_first_date"].dt.strftime("%Y-%m-%d")
     saved.to_csv(folder / "survival_table.csv", index=False, date_format="%Y-%m-%dT%H:%M:%S.%fZ")
 
-    path = main(settings, decision_date=date(2024, 6, 1))
 
-    assert path == settings.outputs / "b_survival" / "b_exploit_timing_scores.csv"
-    frame = _read_component(path, "b_survival")
-    assert frame["trained_through"].iloc[0] == datetime(2024, 6, 1, tzinfo=UTC).isoformat()
+def test_main_writes_both_files_with_the_same_cves_and_statuses(table, tmp_path):
+    settings = load_settings(tmp_path)
+    write_table(table, settings)
+
+    path = main(settings, decision_time=DECISION)
+
+    folder = settings.outputs / "b_survival"
+    assert path == folder / "b_exploit_timing_scores.csv"
+    ranked = _read_component(path, "b_survival")
+    raw = _read_component(folder / "b_exploit_timing_probability.csv", "b_survival")
+    assert ranked["cve_id"].tolist() == raw["cve_id"].tolist()
+    assert ranked["status"].tolist() == raw["status"].tolist()
+    assert ranked["reason"].fillna("").tolist() == raw["reason"].fillna("").tolist()
+    assert ranked["trained_through"].iloc[0] == datetime(2024, 6, 1, tzinfo=UTC).isoformat()
+    metadata = json.loads((folder / "b_exploit_timing_scores.csv.metadata.json").read_text())
+    assert metadata["source_file"] == "b_exploit_timing_probability.csv"
+    assert metadata["source_model_version"] == "b_survival-cox-2024-06-01-0.1"
+    assert metadata["percentile_population"] == int((raw["status"] == "available").sum())
+
+
+def test_main_takes_the_decision_time_and_snapshot_date(table, tmp_path):
+    settings = load_settings(tmp_path)
+    write_table(table, settings)
+    late = datetime(2024, 6, 1, 23, 59, 59, tzinfo=UTC)
+
+    frame = _read_component(
+        main(settings, decision_time=late, snapshot_date=date(2024, 6, 1)), "b_survival"
+    )
+
+    assert set(frame["decision_time"]) == {"2024-06-01T23:59:59+00:00"}
+    assert set(frame["snapshot_date"]) == {"2024-06-01"}
+    # trained_through is the start of the decision day
+    assert set(frame["trained_through"]) == {"2024-06-01T00:00:00+00:00"}

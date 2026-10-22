@@ -10,16 +10,24 @@ status of each CVE is decided in this order:
   abstained          a model input is missing (no CVSS 3.x score), or the
                      horizon reaches past the longest train follow-up, so the
                      estimate would be extrapolated; empty score, with a reason
-  available          the Cox model's estimate of "listed in KEV within the next
-                     HORIZON_DAYS days", given that the CVE is still unlisted at
-                     the decision time:
-                         score = 1 - S(age + HORIZON_DAYS | x) / S(age | x)
-                     where age = days from publication to the decision day. A
-                     CVE published today gets 1 - S(HORIZON_DAYS | x).
+  available          scored (see the two files below)
 
-The score is in [0, 1] and is a RANKING score. It has the form of a probability,
-but its calibration has not been checked on held-out data, so it is not
-called one (score_kind = ranking_score, CONTRIBUTING.md).
+Two files are written, with the same CVEs, statuses and reasons:
+
+  b_exploit_timing_probability.csv   the raw estimate: the Cox model's "listed
+      in KEV within the next HORIZON_DAYS days", given that the CVE is still
+      unlisted at the decision time:
+          raw = 1 - S(age + HORIZON_DAYS | x) / S(age | x)
+      where age = days from publication to the decision day. A CVE published
+      today gets 1 - S(HORIZON_DAYS | x). It has the form of a probability, but
+      its calibration has not been checked on held-out data, so its score_kind
+      is still ranking_score (CONTRIBUTING.md).
+
+  b_exploit_timing_scores.csv        the file Component D reads: the percentile
+      rank of the raw estimate among the AVAILABLE CVEs only, rank / N with tied
+      CVEs sharing the average rank, so it is in (0, 1]. The raw values are
+      about 1e-4, so on their own they would pull D's mean of 0-1 scores down;
+      the percentile puts B on the same scale as Component C's percentile.
 
 The model is fitted with the same rules as the evaluation: post_kev CVEs
 published before `trained_through`, re-censored at that day (split_data), CVEs
@@ -28,16 +36,18 @@ without CVSS left out. By default trained_through = decision time = the start
 trained_through gives the model of an evaluation cut-off. trained_through is
 never after the decision time (the Score contract checks this).
 
-Output:  outputs/b_survival/b_exploit_timing_scores.csv
-         outputs/b_survival/b_exploit_timing_scores.csv.metadata.json
+Output:  outputs/b_survival/b_exploit_timing_probability.csv (+ .metadata.json)
+         outputs/b_survival/b_exploit_timing_scores.csv      (+ .metadata.json)
 
 Run from anywhere (run survival_table first):
     uv run python -m vesper.components.b_survival.score_export
 """
 
+import dataclasses
 import json
 import os
 import tempfile
+import warnings
 from datetime import UTC, datetime, time
 from pathlib import Path
 
@@ -60,6 +70,7 @@ from vesper.contracts.score import Component, Score, ScoreKind, ScoreStatus
 HORIZON_DAYS = 30
 COHORT = "post_kev"
 MODEL_VERSION_SUFFIX = "0.1"
+RAW_OUTPUT_FILE = "b_exploit_timing_probability.csv"
 OUTPUT_FILE = "b_exploit_timing_scores.csv"
 SCORE_COLUMNS = [
     "cve_id",
@@ -89,8 +100,8 @@ def start_of_day(day):
     return datetime.combine(day, time(0, 0), tzinfo=UTC)
 
 
-def model_version(trained_through):
-    return f"b_survival-cox-{trained_through.date().isoformat()}-{MODEL_VERSION_SUFFIX}"
+def model_version(trained_through, kind="cox"):
+    return f"b_survival-{kind}-{trained_through.date().isoformat()}-{MODEL_VERSION_SUFFIX}"
 
 
 def fit_scoring_model(table, trained_through, cohort=COHORT):
@@ -110,7 +121,7 @@ def build_timing_scores(
     horizon_days=HORIZON_DAYS,
     cohort=COHORT,
 ):
-    """Score every CVE of the survival table published before decision_time.
+    """Raw estimates for every CVE of the survival table published before decision_time.
 
     Returns one Score per CVE, in the order of the table.
     """
@@ -178,6 +189,31 @@ def build_timing_scores(
     ]
 
 
+def percentile_ranks(values):
+    """rank / N with average ranks for ties: in (0, 1], the highest value gets 1."""
+    values = pd.Series(values, dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("Percentiles need finite values")
+    return (values.rank(method="average") / len(values)).to_numpy()
+
+
+def percentile_scores(records, trained_through):
+    """The same records with each available score replaced by its percentile rank
+    among the available records. Statuses, reasons and times are unchanged."""
+    available = [i for i, record in enumerate(records) if record.status is ScoreStatus.AVAILABLE]
+    ranks = percentile_ranks([records[i].score for i in available])
+    new_score = dict(zip(available, ranks, strict=True))
+    version = model_version(trained_through, kind="cox-percentile")
+    return [
+        dataclasses.replace(
+            record,
+            score=float(new_score[i]) if i in new_score else None,
+            model_version=version,
+        )
+        for i, record in enumerate(records)
+    ]
+
+
 def scores_to_frame(records):
     """Score records as a table with exactly SCORE_COLUMNS, dates as ISO text."""
     rows = []
@@ -205,24 +241,21 @@ def write_atomically(path, write):
         raise
 
 
-def export_timing_scores(records, output_path, model):
-    """Write the scores CSV and a metadata JSON next to it. Returns the counts per status."""
+def export_scores(records, output_path, model, score_semantics, extra=None):
+    """Write one scores CSV and a metadata JSON next to it. Returns the counts per status."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     frame = scores_to_frame(records)
     write_atomically(output_path, lambda stream: frame.to_csv(stream, index=False))
 
     counts = {state.value: int((frame["status"] == state.value).sum()) for state in ScoreStatus}
+    available = frame.loc[frame["status"] == ScoreStatus.AVAILABLE.value, "score"]
     first = records[0] if records else None
     metadata = {
         "component": Component.B_SURVIVAL.value,
         "model_version": first.model_version if first else None,
         "score_kind": ScoreKind.RANKING_SCORE.value,
-        "score_semantics": (
-            "Cox model estimate of 'listed in CISA KEV within the next horizon_days days', "
-            "given the CVE is still unlisted at the decision time. A ranking score: its "
-            "calibration has not been checked on held-out data, so it is not a probability."
-        ),
+        "score_semantics": score_semantics,
         "cohort": COHORT,
         "decision_time": first.decision_time.isoformat() if first else None,
         "trained_through": first.trained_through.isoformat() if first else None,
@@ -233,43 +266,96 @@ def export_timing_scores(records, output_path, model):
         "train_max_follow_up_days": model.train_max_follow_up,
         "target_count": len(records),
         "status_counts": counts,
+        "score_distribution": {
+            "min": float(available.min()) if len(available) else None,
+            "median": float(available.median()) if len(available) else None,
+            "max": float(available.max()) if len(available) else None,
+        },
         "output_columns": SCORE_COLUMNS,
+        **(extra or {}),
     }
     metadata_path = output_path.with_suffix(output_path.suffix + ".metadata.json")
     write_atomically(metadata_path, lambda stream: stream.write(json.dumps(metadata, indent=2)))
     return counts
 
 
-def print_summary(records, counts, model):
+RAW_SEMANTICS = (
+    "Cox model estimate of 'listed in CISA KEV within the next horizon_days days', given "
+    "the CVE is still unlisted at the decision time: 1 - S(age + h | x) / S(age | x). "
+    "A ranking score: its calibration has not been checked on held-out data, so it is "
+    "not a probability."
+)
+PERCENTILE_SEMANTICS = (
+    "Percentile rank of the raw 30-day estimate among the available CVEs: rank / N, "
+    "ties share the average rank, in (0, 1]. Higher = listed in KEV sooner relative to "
+    "the other CVEs. A relative ranking, not an exploitation probability."
+)
+
+
+def print_summary(raw, counts, model):
     print()
-    print(f"Model: {records[0].model_version if records else '-'}")
+    print(f"Model: {raw[0].model_version if raw else '-'}")
     print(f"  train rows {model.train_rows}, events {model.train_events}")
-    print("Rows per status:")
+    print("Rows per status (the same in both files):")
     for state, count in counts.items():
         print(f"  {state:<18}{count:>9}")
-    scores = pd.Series([r.score for r in records if r.score is not None], dtype=float)
+    scores = pd.Series([r.score for r in raw if r.score is not None], dtype=float)
     if len(scores):
         quantiles = scores.quantile([0, 0.5, 0.9, 0.99, 1])
-        print("Available scores: " + ", ".join(f"q{q:g}={v:.5f}" for q, v in quantiles.items()))
+        print("Raw estimates: " + ", ".join(f"q{q:g}={v:.5f}" for q, v in quantiles.items()))
         print(f"  mean {scores.mean():.5f}")
 
 
-def main(settings=None, decision_date=SNAPSHOT_DATE, trained_through_date=None):
-    """Fit the scoring model, score every CVE, and write the CSV and its metadata."""
+def main(settings=None, decision_time=None, snapshot_date=SNAPSHOT_DATE, trained_through=None):
+    """Fit the scoring model, score every CVE, and write both files and their metadata.
+
+    decision_time and trained_through are timezone-aware datetimes. By default the
+    decision time is 00:00 UTC on SNAPSHOT_DATE and trained_through is the start
+    of the decision day (never later than the snapshot).
+    """
     # Folders come from vesper.config
     settings = settings or load_settings()
     table = load_survival_table(settings.data_processed / PROCESSED_SUBFOLDER / OUTPUT_FILE_NAME)
-    decision_time = start_of_day(decision_date)
-    trained_through = start_of_day(trained_through_date or decision_date)
+    decision_time = decision_time or start_of_day(SNAPSHOT_DATE)
+    if decision_time.tzinfo is None:
+        raise ValueError("decision_time must include a time zone")
+    decision_day = decision_time.astimezone(UTC).date()
+    if decision_day > SNAPSHOT_DATE:
+        warnings.warn(
+            f"The decision day {decision_day} is after the data snapshot {SNAPSHOT_DATE}: "
+            "KEV listings and CVEs after the snapshot are not known",
+            stacklevel=2,
+        )
+    trained_through = trained_through or start_of_day(min(decision_day, SNAPSHOT_DATE))
 
     model = fit_scoring_model(table, trained_through)
-    records = build_timing_scores(
-        table, model, decision_time=decision_time, trained_through=trained_through
+    raw = build_timing_scores(
+        table,
+        model,
+        decision_time=decision_time,
+        trained_through=trained_through,
+        snapshot_date=snapshot_date,
     )
-    output_path = settings.outputs / PROCESSED_SUBFOLDER / OUTPUT_FILE
-    counts = export_timing_scores(records, output_path, model)
-    print_summary(records, counts, model)
+    ranked = percentile_scores(raw, trained_through)
+
+    output_dir = settings.outputs / PROCESSED_SUBFOLDER
+    raw_path, output_path = output_dir / RAW_OUTPUT_FILE, output_dir / OUTPUT_FILE
+    counts = export_scores(raw, raw_path, model, RAW_SEMANTICS)
+    export_scores(
+        ranked,
+        output_path,
+        model,
+        PERCENTILE_SEMANTICS,
+        extra={
+            "source_file": RAW_OUTPUT_FILE,
+            "source_model_version": raw[0].model_version if raw else None,
+            "percentile_population": counts[ScoreStatus.AVAILABLE.value],
+            "percentile_definition": "rank / N, average ranks for ties, in (0, 1]",
+        },
+    )
+    print_summary(raw, counts, model)
     print()
+    print("Saved:", raw_path)
     print("Saved:", output_path)
     return output_path
 
