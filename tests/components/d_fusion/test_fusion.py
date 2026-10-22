@@ -1,8 +1,12 @@
 from datetime import date
 
 import pandas as pd
+import pytest
 
-from vesper.components.d_fusion.fusion import build_fused_dummy_dataset
+from vesper.components.d_fusion.fusion import (
+    build_fused_dataset,
+    build_fused_dummy_dataset,
+)
 
 CVE_IDS = ("CVE-2023-0001", "CVE-2023-0002", "CVE-2023-0003")
 DECISION_TIME = "2026-10-11T23:59:59+00:00"
@@ -91,3 +95,58 @@ def test_missing_signal_is_omitted_from_mean_not_counted_as_zero(tmp_path):
     assert pd.isna(row["score_b"])
     assert row["signals_used"] == 4
     assert row["fusion_score"] == 0.5
+
+
+def _write_first_version_inputs(tmp_path):
+    baseline_path, component_dir = _write_inputs(tmp_path)
+    component_paths = {
+        "a": component_dir / "a_text_scores.csv",
+        "b": component_dir / "b_exploit_timing_scores.csv",
+        "c": component_dir / "c_graph_scores.csv",
+    }
+    return baseline_path, component_paths
+
+
+@pytest.mark.parametrize(
+    ("field", "conflicting_value"),
+    [
+        ("decision_time", "2026-10-12T00:00:00+00:00"),
+        ("horizon_days", 90),
+        ("snapshot_date", "2026-10-12"),
+    ],
+)
+def test_build_fused_dataset_rejects_mismatched_component_context(
+    tmp_path, field, conflicting_value
+):
+    baseline_path, component_paths = _write_first_version_inputs(tmp_path)
+    component_b = pd.read_csv(component_paths["b"])
+    component_b.loc[0, field] = conflicting_value
+    component_b.to_csv(component_paths["b"], index=False)
+
+    with pytest.raises(ValueError, match=f"Component {field} values do not match"):
+        build_fused_dataset(baseline_path, component_paths)
+
+
+def test_build_fused_dataset_preserves_matching_component_context(tmp_path):
+    baseline_path, component_paths = _write_first_version_inputs(tmp_path)
+
+    fused, _ = build_fused_dataset(baseline_path, component_paths)
+
+    assert set(fused["decision_time"]) == {"2026-10-11T23:59:59Z"}
+    assert set(fused["snapshot_date"]) == {SNAPSHOT_DATE}
+    assert set(fused["horizon_days"].dropna()) == {30}
+
+
+def test_build_fused_dataset_rejects_mixed_context_for_disjoint_component_cohorts(
+    tmp_path,
+):
+    baseline_path, component_paths = _write_first_version_inputs(tmp_path)
+    for key, cve_id in zip(("a", "b", "c"), CVE_IDS, strict=True):
+        frame = pd.read_csv(component_paths[key])
+        frame = frame.loc[frame["cve_id"] == cve_id].copy()
+        if key == "b":
+            frame["horizon_days"] = 90
+        frame.to_csv(component_paths[key], index=False)
+
+    with pytest.raises(ValueError, match="Component horizon_days values do not match"):
+        build_fused_dataset(baseline_path, component_paths)

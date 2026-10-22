@@ -54,7 +54,72 @@ def _read_component(path: Path, component: str) -> pd.DataFrame:
         {"available", "abstained", "already_exploited", "not_eligible"}
     ).all():
         raise ValueError(f"{path.name} contains an unknown score status")
+    decision_times = pd.to_datetime(frame["decision_time"], utc=True, errors="coerce")
+    if decision_times.isna().any():
+        raise ValueError(f"{path.name} must have valid decision_time values")
+    snapshots = pd.to_datetime(frame["snapshot_date"], utc=True, errors="coerce")
+    if snapshots.isna().any():
+        raise ValueError(f"{path.name} must have valid snapshot_date values")
+    horizons = pd.to_numeric(frame["horizon_days"], errors="coerce")
+    if (
+        horizons.isna().any()
+        or (horizons <= 0).any()
+        or (horizons % 1 != 0).any()
+    ):
+        raise ValueError(f"{path.name} must have positive integer horizon_days values")
     return frame
+
+
+def _shared_component_context(
+    result: pd.DataFrame, keys: tuple[str, ...], field: str
+) -> pd.Series:
+    """Return one shared snapshot context and reject mixed component metadata."""
+
+    columns = [f"{field}_{key}" for key in keys]
+    if field == "decision_time":
+        values = pd.concat(
+            [pd.to_datetime(result[column], utc=True, errors="coerce") for column in columns],
+            axis=1,
+        )
+    elif field == "snapshot_date":
+        values = pd.concat(
+            [
+                pd.to_datetime(result[column], utc=True, errors="coerce").dt.normalize()
+                for column in columns
+            ],
+            axis=1,
+        )
+    else:
+        values = pd.concat(
+            [pd.to_numeric(result[column], errors="coerce") for column in columns],
+            axis=1,
+        )
+
+    component_values: list[object] = []
+    for index, key in enumerate(keys):
+        unique_values = values.iloc[:, index].dropna().unique()
+        if len(unique_values) > 1:
+            raise ValueError(
+                f"Component {field} values do not match within component {key.upper()}; "
+                "provide one compatible snapshot context per component file"
+            )
+        if len(unique_values) == 1:
+            component_values.append(unique_values[0])
+
+    if component_values and any(value != component_values[0] for value in component_values[1:]):
+        raise ValueError(
+            f"Component {field} values do not match across files; "
+            "refusing to fuse incompatible decision contexts"
+        )
+
+    mismatch = values.nunique(axis=1, dropna=True) > 1
+    if mismatch.any():
+        cve_id = result.loc[mismatch, "cve_id"].iloc[0]
+        raise ValueError(
+            f"Component {field} values do not match for CVE {cve_id}; "
+            "refusing to fuse incompatible decision contexts"
+        )
+    return values.bfill(axis=1).iloc[:, 0]
 
 
 def build_fused_dummy_dataset(
@@ -231,9 +296,7 @@ def build_fused_dataset(
 
     result = baseline.copy()
     coverage: dict[str, int] = {}
-    source_decision_times = []
-    source_snapshots = [pd.to_datetime(result["snapshot_date"], utc=True)]
-    source_horizons = []
+    component_keys = ("a", "b", "c")
     baseline_ids = set(result["cve_id"])
 
     for key, component in (("a", "a_text"), ("b", "b_survival"), ("c", "c_graph")):
@@ -256,14 +319,6 @@ def build_fused_dataset(
             columns=suffix_columns
         )
         result = result.merge(frame, on="cve_id", how="left", validate="one_to_one")
-        source_decision_times.append(
-            pd.to_datetime(result[f"decision_time_{key}"], utc=True, errors="coerce")
-        )
-        source_snapshots.append(
-            pd.to_datetime(result[f"snapshot_date_{key}"], utc=True, errors="coerce")
-        )
-        source_horizons.append(pd.to_numeric(result[f"horizon_days_{key}"], errors="coerce"))
-
     result["cvss_normalized"] = pd.to_numeric(
         result["cvss_base_score"], errors="coerce"
     ).div(10.0)
@@ -280,7 +335,6 @@ def build_fused_dataset(
     result["fusion_score"] = signals.mean(axis=1).round(6)
     result["fusion_method"] = FUSION_METHOD
 
-    patch_coverage = 0
     if patch_hours_path is not None:
         if not patch_hours_path.is_file():
             raise FileNotFoundError(f"Patch effort estimates not found: {patch_hours_path}")
@@ -316,7 +370,6 @@ def build_fused_dataset(
             effort_values[comparable].reset_index(drop=True)
         ):
             raise ValueError("Patch effort CVSS values do not match the baseline by CVE ID")
-        patch_coverage = int(result["cve_id"].isin(effort["cve_id"]).sum())
         effort = effort[
             ["cve_id", "est_patch_hours", "severity_tier", "method", "ownership"]
         ].rename(
@@ -334,18 +387,25 @@ def build_fused_dataset(
         result["patch_hours_method"] = pd.NA
         result["patch_hours_ownership"] = pd.NA
 
-    effective_times = pd.concat(source_decision_times + [
-        pd.to_datetime(result["snapshot_date"], utc=True, errors="coerce")
-    ], axis=1)
-    result["decision_time"] = effective_times.max(axis=1).dt.strftime(
+    baseline_snapshots = pd.to_datetime(result["snapshot_date"], utc=True, errors="coerce")
+    result["baseline_snapshot_date"] = baseline_snapshots.dt.strftime("%Y-%m-%d").astype(
+        "string"
+    )
+    shared_decision_times = _shared_component_context(
+        result, component_keys, "decision_time"
+    )
+    shared_snapshots = _shared_component_context(result, component_keys, "snapshot_date")
+    shared_horizons = _shared_component_context(result, component_keys, "horizon_days")
+    # Keep component context distinct from the baseline snapshot. Use the
+    # baseline as-of time only for CVEs with no component context; never choose
+    # a later timestamp by taking a maximum across sources.
+    result["decision_time"] = shared_decision_times.fillna(baseline_snapshots).dt.strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
-    effective_snapshots = pd.concat(source_snapshots, axis=1)
-    result["snapshot_date"] = effective_snapshots.max(axis=1).dt.strftime("%Y-%m-%d")
-    all_horizons = pd.concat(source_horizons, axis=1)
-    result["horizon_days"] = all_horizons.max(axis=1).astype("Int64")
-
-    result["baseline_snapshot_date"] = result["snapshot_date"].astype("string")
+    result["snapshot_date"] = shared_snapshots.fillna(baseline_snapshots).dt.strftime(
+        "%Y-%m-%d"
+    )
+    result["horizon_days"] = shared_horizons.astype("Int64")
     versions = result[["model_version_a", "model_version_b", "model_version_c"]]
     has_synthetic = versions.astype("string").apply(
         lambda column: column.str.contains("synthetic", case=False, na=False)
