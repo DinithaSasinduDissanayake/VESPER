@@ -153,12 +153,6 @@
 }
 
 @layer utilities {
-  .app-backdrop {
-    background-image:
-      radial-gradient(ellipse at 82% 8%, oklch(0.90 0.055 235 / 45%), transparent 32rem),
-      radial-gradient(ellipse at 18% 90%, oklch(0.93 0.045 260 / 38%), transparent 34rem);
-  }
-
   .queue-hero-pattern {
     background-image:
       radial-gradient(circle at 82% 25%, oklch(0.82 0.12 210 / 22%), transparent 12rem),
