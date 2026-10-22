@@ -230,7 +230,7 @@ export function SprintPlanPage() {
                   </p>
                   <p className="text-xs text-muted-foreground">As of {source?.data_as_of ?? '—'}</p>
                   <p className="text-xs text-muted-foreground">
-                    Text {source?.snapshot_date_a ?? '—'} · Timing {source?.snapshot_date_b ?? '—'} · Exposure {source?.snapshot_date_c ?? '—'} · CVSS {source?.baseline_snapshot_date ?? '—'} · EPSS {source?.epss_date ?? '—'}
+                    Text {source?.snapshot_date_a ?? '—'} · Timing {source?.snapshot_date_b ?? '—'} · Structural {source?.snapshot_date_c ?? '—'} · CVSS {source?.baseline_snapshot_date ?? '—'} · EPSS {source?.epss_date ?? '—'}
                   </p>
                 </>
               ) : <p className="text-sm text-muted-foreground">Ranking unavailable. Check FastAPI and its configured ranking CSV.</p>}
@@ -325,7 +325,7 @@ export function SprintPlanPage() {
                     <TableHead>Risk rank</TableHead><TableHead>CVE</TableHead>
                     <TableHead className="text-right">Composite</TableHead>
                     <TableHead className="text-right">Text</TableHead><TableHead className="text-right">Exploit timing</TableHead>
-                    <TableHead className="text-right">Exposure</TableHead><TableHead className="text-right">CVSS</TableHead>
+                    <TableHead className="text-right">Structural signal</TableHead><TableHead className="text-right">CVSS</TableHead>
                     <TableHead className="text-right">EPSS</TableHead>
                     <TableHead>Criticality</TableHead><TableHead>Patch h</TableHead>
                     {view === 'plan' && <TableHead>Plan note</TableHead>}

@@ -42,7 +42,7 @@ function RelationshipEvidence({ data }: { data: StructuralDetails }) {
 export function ExposureSection({ resource, item }: { resource?: StructuralDetailsState; item?: QueueItem }) {
   const id = useId()
   if (!resource && item) {
-    return <ScoreSection title="Exposure" score={findScore(item, 'c_graph')} />
+    return <ScoreSection title="Structural signal" score={findScore(item, 'c_graph')} />
   }
   if (!resource) return null
 
@@ -75,6 +75,18 @@ export function ExposureSection({ resource, item }: { resource?: StructuralDetai
                 ['Evidence status', resource.data.provenance.evidenceStatus],
                 ['Product evidence', resource.data.relationships.vendorProducts.status],
                 ['Weakness evidence', resource.data.relationships.cweIds.status],
+                ...(resource.data.provenance.snapshotId ? [
+                  ['Snapshot ID', resource.data.provenance.snapshotId],
+                  ['Provider model (raw PageRank)', resource.data.provenance.providerModelVersion],
+                  ['Feature schema', resource.data.provenance.featureSchemaVersion],
+                  ['Source published', resource.data.provenance.sourcePublishedAt],
+                  ['Source last modified', resource.data.provenance.sourceModifiedAt],
+                  ['Source NVD file', resource.data.provenance.sourceFile],
+                  ['Feature provenance', resource.data.provenance.featureProvenance],
+                  ['Provider SHA-256', resource.data.provenance.providerSha256],
+                  ['Score SHA-256', resource.data.provenance.scoresSha256],
+                  ['Analysis SHA-256', resource.data.provenance.analysisSha256 ?? 'Not configured'],
+                ] : []),
               ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 break-all font-medium">{value}</dd></div>)}
             </dl>
             <p className="mt-4 text-xs leading-relaxed text-muted-foreground">This signal measures structural importance within the observed vulnerability–product–weakness graph. It is not an exploitation probability.</p>

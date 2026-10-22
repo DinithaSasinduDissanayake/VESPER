@@ -19,7 +19,7 @@ type HomePageProps = {
 const signalDescriptions = [
   { key: 'A', title: 'Text signal', detail: 'Risk evidence from vulnerability descriptions.' },
   { key: 'B', title: 'Exploit timing', detail: 'Exploit availability and timing evidence.' },
-  { key: 'C', title: 'Exposure', detail: 'Graph based product and weakness context.' },
+  { key: 'C', title: 'Structural relationships', detail: 'Graph based product and weakness context.' },
   { key: 'CVSS', title: 'Severity', detail: 'Published vulnerability severity score.' },
   { key: 'EPSS', title: 'Exploit likelihood', detail: 'Published exploitation probability estimate.' },
 ]

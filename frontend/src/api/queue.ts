@@ -142,6 +142,49 @@ export function getCveDetails(cveId: string, signal?: AbortSignal): Promise<Vuln
   return requestJson<VulnerabilityFacts>(`/api/d-fusion/cves/${encodeURIComponent(cveId)}`, { signal })
 }
 
+export type ComponentCResponse = {
+  cve_id: string
+  structural_score: number | null
+  score_kind: 'ranking_score'
+  score_status: 'available' | 'abstained' | 'not_eligible' | 'already_exploited'
+  score_reason: string | null
+  raw_pagerank: number | null
+  degree: number | null
+  pagerank_comparison_percentile: number | null
+  cvss_percentile: number | null
+  pagerank_cvss_disagreement: number | null
+  comparison_status: string
+  comparison_reason: string | null
+  scoring_population: number
+  comparison_population: number | null
+  vendor_product_relationships: { vendor: string; product: string }[]
+  cwe_ids: string[]
+  cpe_evidence_status: 'supported' | 'unavailable' | 'not_evaluated'
+  cpe_evidence_reason: string | null
+  cwe_evidence_status: 'supported' | 'unavailable' | 'not_evaluated'
+  cwe_evidence_reason: string | null
+  snapshot_date: string
+  reference_time: string
+  model_version: string
+  provenance: {
+    snapshot_id: string
+    graph_scope_id: string
+    feature_schema_version: string
+    provider_model_version: string
+    source_record_published_at: string
+    source_record_last_modified_at: string
+    source_nvd_file: string
+    feature_provenance: string
+    provider_sha256: string
+    scores_sha256: string
+    analysis_sha256: string | null
+  }
+}
+
+export function getComponentCDetails(cveId: string, signal?: AbortSignal): Promise<ComponentCResponse> {
+  return requestJson<ComponentCResponse>(`/api/c-graph/cves/${encodeURIComponent(cveId)}`, { signal })
+}
+
 export async function downloadPlannerRanking(signal?: AbortSignal): Promise<Blob> {
   const response = await fetch('/api/d-fusion/ranking.csv', { signal })
   if (!response.ok) throw new Error(`Could not download ranking (${response.status})`)

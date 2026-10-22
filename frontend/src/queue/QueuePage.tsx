@@ -42,7 +42,7 @@ function RankingRows({ candidates, onSelect }: { candidates: PlannerCandidate[];
           <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Risk score</TableHead>
           <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Text (A)</TableHead>
           <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Timing (B)</TableHead>
-          <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Exposure (C)</TableHead>
+          <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Structural signal (C)</TableHead>
           <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">CVSS</TableHead>
           <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">EPSS</TableHead>
           <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Signals</TableHead>

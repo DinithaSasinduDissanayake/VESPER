@@ -4,29 +4,13 @@ import { getCveDetails, type PlannerCandidate, type VulnerabilityFacts } from '@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ExposureSection } from '@/exposure/ExposureSection'
-import { sampleStructuralDetails, sampleStructuralState } from '@/exposure/sampleStructuralDetails'
-import type { StructuralDetails, StructuralDetailsState } from '@/exposure/types'
+import { useComponentCDetails } from '@/exposure/data'
 import { TimingSection } from '@/timing/TimingSection'
 import type { QueueItem } from './types'
 
 type CveDetailProps = {
   candidate: PlannerCandidate
   onBack: () => void
-}
-
-// Same rule as structuralStateForQueueItem, read from the planner row's C fields.
-function structuralStateForCandidate(candidate: PlannerCandidate): StructuralDetailsState {
-  const data = sampleStructuralDetails(candidate.cve_id, candidate.score_c ?? 0.97)
-  if (candidate.status_c !== 'available' || candidate.score_c === null) {
-    const unavailable = sampleStructuralState(candidate.status_c === 'not_eligible' ? 'not_eligible' : 'unavailable')
-    if (unavailable.state === 'loaded') {
-      unavailable.data.cveId = data.cveId
-      unavailable.data.structuralScore.status = (candidate.status_c ?? 'unavailable') as StructuralDetails['structuralScore']['status']
-      unavailable.data.structuralScore.reason = candidate.reason_c ?? 'No sample structural score supplied.'
-      return unavailable
-    }
-  }
-  return { state: 'loaded', data }
 }
 
 // TimingSection reads a queue row; build one from the planner row and NVD facts.
@@ -122,7 +106,7 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
           <SignalCard title="Provisional risk score · rank" value={candidate.risk_score} note={`Rank ${candidate.model_rank} · ${candidate.signals_used ?? '—'} of 5 signals used`} />
           <SignalCard title="Text signal (A)" value={candidate.score_a} status={candidate.status_a} reason={candidate.reason_a} />
           <SignalCard title="Exploit timing (B)" value={candidate.score_b} status={candidate.status_b} reason={candidate.reason_b} />
-          <SignalCard title="Exposure (C)" value={candidate.score_c} status={candidate.status_c} reason={candidate.reason_c} note="Structural graph signal; not an exploitation probability." />
+          <SignalCard title="Structural signal · ranking input" value={candidate.status_c && candidate.status_c !== 'available' ? null : candidate.score_c} status={candidate.status_c} reason={candidate.reason_c} note="Preserved from D's ranking. Source model version is not exposed by this ranking API; see the artifact-backed panel separately." />
           <SignalCard title={`CVSS${facts.cvss_version ? ` ${facts.cvss_version}` : ''}`} value={facts.cvss_base_score} digits={1} note={facts.cvss_vector ? `Vector: ${facts.cvss_vector}` : 'CVSS vector unavailable'} />
           <SignalCard title="EPSS" value={candidate.epss_score} note={candidate.epss_date ? `Snapshot: ${candidate.epss_date}` : 'Exploit prediction score'} />
         </div>
@@ -161,10 +145,6 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
         </Card>
 
         <div className="min-w-0 lg:col-span-2">
-          <ExposureSection resource={structuralStateForCandidate(candidate)} />
-        </div>
-
-        <div className="min-w-0 lg:col-span-2">
           <TimingSection item={timingItem(facts, candidate)} />
         </div>
       </div>
@@ -178,7 +158,7 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
           {[
             ['Text snapshot', candidate.snapshot_date_a],
             ['Timing snapshot', candidate.snapshot_date_b],
-            ['Exposure snapshot', candidate.snapshot_date_c],
+            ['Structural signal snapshot', candidate.snapshot_date_c],
             ['Baseline snapshot', candidate.baseline_snapshot_date],
           ].map(([label, value]) => (
             <div key={label}>
@@ -193,6 +173,7 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
 }
 
 export function CveDetail({ candidate, onBack }: CveDetailProps) {
+  const structural = useComponentCDetails(candidate.cve_id)
   const [facts, setFacts] = useState<VulnerabilityFacts | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -249,6 +230,8 @@ export function CveDetail({ candidate, onBack }: CveDetailProps) {
       ) : facts ? (
         <FactsView facts={facts} candidate={candidate} />
       ) : null}
+      <p className="text-xs text-muted-foreground">The structural panel uses its own declared artifact snapshot. The ranking input above may refer to a different source snapshot.</p>
+      <ExposureSection key={candidate.cve_id} resource={structural} />
     </div>
   )
 }
