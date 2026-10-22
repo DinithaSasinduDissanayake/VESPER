@@ -7,10 +7,12 @@ import { ExposurePage } from '@/exposure/ExposurePage'
 import { SprintPlanPage } from '@/plan/SprintPlanPage'
 import { QueuePage } from '@/queue/QueuePage'
 import { ScoresPage } from '@/scores/ScoresPage'
+import { TimingPage } from '@/timing/TimingPage'
 
 // The component that draws each page.
 const pageComponents: Record<PageId, ComponentType> = {
   queue: QueuePage,
+  timing: TimingPage,
   exposure: ExposurePage,
   sprint: SprintPlanPage,
   analyse: AnalysePage,

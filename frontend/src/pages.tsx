@@ -3,10 +3,11 @@ import {
   CirclePlus,
   ListChecks,
   Radar,
+  Timer,
   type LucideIcon,
 } from 'lucide-react'
 
-export type PageId = 'queue' | 'exposure' | 'sprint' | 'analyse' | 'scores'
+export type PageId = 'queue' | 'timing' | 'exposure' | 'sprint' | 'analyse' | 'scores'
 
 type Page = {
   title: string
@@ -18,6 +19,10 @@ export const pages: Record<PageId, Page> = {
   queue: {
     title: 'Priority queue',
     icon: ListChecks,
+  },
+  timing: {
+    title: 'Exploit timing',
+    icon: Timer,
   },
   exposure: {
     title: 'Exposure',
@@ -37,4 +42,4 @@ export const pages: Record<PageId, Page> = {
 }
 
 // Order of the items in the main sidebar menu.
-export const mainNav: PageId[] = ['queue', 'exposure', 'sprint', 'analyse']
+export const mainNav: PageId[] = ['queue', 'timing', 'exposure', 'sprint', 'analyse']
