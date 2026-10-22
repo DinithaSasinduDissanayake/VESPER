@@ -242,6 +242,32 @@ def test_missing_configuration_is_explicit_not_a_fixture_fallback(
     assert "VESPER_C_SCORES_CSV" in response.json()["detail"]
 
 
+@pytest.mark.parametrize("missing", ["provider", "metadata", "scores_metadata"])
+def test_missing_artifact_files_return_clean_503(client, artifacts, missing):
+    provider = os.environ["VESPER_C_FEATURE_PROVIDER_CSV"]
+    scores = os.environ["VESPER_C_SCORES_CSV"]
+    target = {
+        "provider": provider,
+        "metadata": provider[: -len(".csv")] + ".metadata.json",
+        "scores_metadata": scores + ".metadata.json",
+    }[missing]
+    os.remove(target)
+    response = client.get("/api/c-graph/cves/CVE-2024-0001")
+    assert response.status_code == 503
+    assert "unavailable" in response.json()["detail"]
+
+
+def test_default_paths_missing_return_clean_503(client, monkeypatch, tmp_path):
+    for name in ("VESPER_C_FEATURE_PROVIDER_CSV", "VESPER_C_SCORES_CSV"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv("VESPER_C_DISAGREEMENT_CSV", raising=False)
+    monkeypatch.setattr(c_graph, "_index", None)
+    monkeypatch.chdir(tmp_path)
+    response = client.get("/api/c-graph/cves/CVE-2024-0001")
+    assert response.status_code == 503
+    assert "unavailable" in response.json()["detail"]
+
+
 @pytest.mark.parametrize(
     "layer,value", [("cpe", "not-json"), ("cpe", '[["vendor"]]'), ("cwe", '["invented weakness"]')]
 )
