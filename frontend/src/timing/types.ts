@@ -40,6 +40,24 @@ export type TimingDetail = {
   evidence: EvidenceItem[] // only items dated before the decision time
   kev: { date: string; after_decision: boolean } | null
   factors: Factor[]
+  // Plain-language fields
+  level: Level | null // null when there is no score
+  reasons: string[]
+  vendor: string | null
+  product: string | null
+  description: string | null
+  nvd_url: string
+}
+
+export type Level = 'High' | 'Medium' | 'Low'
+
+export type RecentKev = {
+  cve_id: string
+  date_added: string
+  vendor: string | null
+  product: string | null
+  name: string | null
+  nvd_url: string
 }
 
 export type ModelMetric = {
@@ -106,6 +124,12 @@ export type TimingData = {
     bands_model_version: string
     kaplan_meier: { cohort: string; rows: number; events: number; points: [day: number, survival: number][] }
   }
+  levels: {
+    rule: string
+    cutoffs: Record<'High' | 'Medium', number>
+    counts: Record<Level, number>
+  }
+  recent_kev: { window_days: number; count: number; items: RecentKev[] }
   top: string[]
   cves: {
     current: Record<string, TimingDetail>

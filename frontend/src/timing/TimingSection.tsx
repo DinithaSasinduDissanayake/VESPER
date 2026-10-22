@@ -5,7 +5,8 @@ import { findScore } from '@/queue/format'
 import { ScoreSection } from '@/queue/ScoreSection'
 import type { QueueItem } from '@/queue/types'
 import { REGENERATE_COMMAND, useTimingData } from './data'
-import { RetrospectiveLabel, TimingDetailView } from './TimingDetail'
+import { chanceText, day } from './format'
+import { LevelBadge, Reasons, RetrospectiveLabel } from './TimingDetail'
 
 export function MissingDataCard({ message }: { message: string }) {
   return (
@@ -38,8 +39,18 @@ export function TimingSection({ item }: { item: QueueItem }) {
           Exploit timing <RetrospectiveLabel />
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <TimingDetailView detail={detail} />
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <LevelBadge level={detail.level} status={detail.status} />
+          {detail.raw_30d !== null && (
+            <span>
+              <strong className="text-lg">{chanceText(detail.raw_30d)}</strong>{' '}
+              <span className="text-muted-foreground">estimated chance of joining CISA's attacked list (KEV) in 30 days</span>
+            </span>
+          )}
+        </div>
+        <Reasons detail={detail} />
+        <p className="text-xs text-muted-foreground">As of {day(detail.decision_time)}.</p>
       </CardContent>
     </Card>
   )

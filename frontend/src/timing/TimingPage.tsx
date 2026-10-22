@@ -1,18 +1,19 @@
-// Owner: S.S.H. Thennakoon — Exploit timing results page (real model output).
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
+// Owner: S.S.H. Thennakoon — Exploit timing page: an urgent list for the people
+// who patch, and a separate tab with the proof (real model output).
+import { Fragment, useState } from 'react'
+import { ExternalLink, ShieldAlert } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { statusLabels } from '@/queue/format'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { BandsChart, LineChart } from './charts'
 import { useTimingData } from './data'
+import { bandLabel, chanceText, day, whatItIs, zoomedDomain } from './format'
+import { LevelBadge, Reasons, RetrospectiveLabel } from './TimingDetail'
 import { MissingDataCard } from './TimingSection'
-import { bandLabel, day, zoomedDomain } from './format'
-import { RetrospectiveLabel, TimingDetailView } from './TimingDetail'
-import type { Difference, Interval, TimingData, TimingDetail } from './types'
+import type { Interval, TimingData } from './types'
 
-const cohortNames: Record<string, string> = { post_kev: 'Post-KEV (main)', full: 'All CVEs' }
+const cohortNames: Record<string, string> = { post_kev: 'CVEs since KEV began (main)', full: 'All CVEs' }
 
 function ci([lower, upper]: Interval, digits = 3): string {
   return `${lower.toFixed(digits)} to ${upper.toFixed(digits)}`
@@ -22,56 +23,179 @@ function signed(value: number, digits = 3): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`
 }
 
-function Verdict({ difference }: { difference: Difference }) {
-  return difference.excludes_zero ? (
-    <span className="font-medium text-emerald-700 dark:text-emerald-400">significant (interval excludes 0)</span>
-  ) : (
-    <span className="font-medium text-muted-foreground">not significant (interval includes 0)</span>
+// ---------------------------------------------------------------------------
+// Tab 1: Urgent list
+// ---------------------------------------------------------------------------
+
+function UrgentTable({ data }: { data: TimingData }) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  return (
+    <Card className="min-w-0">
+      <CardHeader>
+        <CardTitle>Patch these first</CardTitle>
+        <CardDescription>
+          The {data.top.length} vulnerabilities most likely to be added to CISA's list of attacked vulnerabilities
+          (KEV) in the next 30 days. Click a row to see why.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12 text-right">#</TableHead>
+              <TableHead>Level</TableHead>
+              <TableHead>Vulnerability</TableHead>
+              <TableHead>Software</TableHead>
+              <TableHead>Published</TableHead>
+              <TableHead className="text-right">30-day chance</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.top.map((id) => {
+              const detail = data.cves.current[id]
+              const open = openId === id
+              return (
+                <Fragment key={id}>
+                  <TableRow
+                    className={cn('cursor-pointer', open && 'bg-muted/50')}
+                    onClick={() => setOpenId(open ? null : id)}
+                    aria-expanded={open}
+                  >
+                    <TableCell className="text-right">{detail.rank ?? '—'}</TableCell>
+                    <TableCell>
+                      <LevelBadge level={detail.level} status={detail.status} />
+                    </TableCell>
+                    <TableCell className="font-mono">{id}</TableCell>
+                    <TableCell className="max-w-64 truncate" title={whatItIs(detail)}>
+                      {whatItIs(detail)}
+                    </TableCell>
+                    <TableCell>{detail.published}</TableCell>
+                    <TableCell className="text-right font-medium">{chanceText(detail.raw_30d)}</TableCell>
+                  </TableRow>
+                  {open && (
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableCell />
+                      <TableCell colSpan={5} className="whitespace-normal">
+                        <div className="flex flex-col gap-2 py-1">
+                          <Reasons detail={detail} />
+                          <a
+                            href={detail.nvd_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 self-start text-xs underline"
+                          >
+                            Read the full advisory on NVD <ExternalLink className="size-3" />
+                          </a>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              )
+            })}
+          </TableBody>
+        </Table>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Vulnerabilities with the same score share the same number.
+        </p>
+      </CardContent>
+    </Card>
   )
 }
 
-function Headline({ data }: { data: TimingData }) {
-  const { main, main_cutoff } = data.results
+function AlreadyAttacked({ data }: { data: TimingData }) {
+  const { recent_kev: recent } = data
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {(['post_kev', 'full'] as const).map((cohort) => {
-        const { cox, cvss, difference } = main[cohort]
-        return (
-          <Card key={cohort}>
-            <CardHeader>
-              <CardTitle>{cohortNames[cohort]}</CardTitle>
-              <CardDescription>
-                Cut-off {main_cutoff}: trained on {cox.train_events} KEV listings, tested on the next 365 days (
-                {cox.test_events} listings)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-                <dt className="text-muted-foreground">C-index, survival model</dt>
-                <dd className="font-semibold">
-                  {cox.c_index.toFixed(3)} <span className="font-normal">({ci(cox.c_index_ci)})</span>
-                </dd>
-                <dt className="text-muted-foreground">C-index, CVSS only</dt>
-                <dd className="font-semibold">
-                  {cvss.c_index.toFixed(3)} <span className="font-normal">({ci(cvss.c_index_ci)})</span>
-                </dd>
-                <dt className="text-muted-foreground">Paired difference</dt>
-                <dd>
-                  <span className="text-lg font-semibold">{signed(difference.difference)}</span> (95% CI{' '}
-                  {ci(difference.ci)})
-                  <br />
-                  <Verdict difference={difference} />
-                </dd>
-                <dt className="text-muted-foreground">P@100 model / CVSS</dt>
-                <dd>
-                  {cox.p_at_100.toFixed(2)} / {cvss.p_at_100.toFixed(2)}
-                </dd>
-              </dl>
-            </CardContent>
-          </Card>
-        )
-      })}
+    <Card className="border-red-500/40">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ShieldAlert className="size-4 text-red-600" /> Already attacked: patch these first
+        </CardTitle>
+        <CardDescription>
+          {recent.count} vulnerabilities were added to the KEV list in the {recent.window_days} days before{' '}
+          {day(data.meta.decision_time)}. They are known to be attacked, so there is nothing to predict.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="flex flex-col gap-2">
+          {recent.items.map((item) => (
+            <li key={item.cve_id} className="flex flex-col">
+              <a href={item.nvd_url} target="_blank" rel="noreferrer" className="font-mono underline">
+                {item.cve_id}
+              </a>
+              <span>{[item.vendor, item.product].filter(Boolean).join(' ') || item.name}</span>
+              <span className="text-xs text-muted-foreground">Added {item.date_added}</span>
+            </li>
+          ))}
+        </ul>
+        {recent.count > recent.items.length && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Showing the newest {recent.items.length} of {recent.count}.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function UrgentTab({ data }: { data: TimingData }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-muted-foreground">
+        As of <strong className="text-foreground">{day(data.meta.decision_time)}</strong>. Levels:{' '}
+        <strong className="text-foreground">High</strong> = top 5% of all scored vulnerabilities (
+        {data.levels.counts.High.toLocaleString()}), <strong className="text-foreground">Medium</strong> = next 15%,{' '}
+        <strong className="text-foreground">Low</strong> = the rest. The 30-day chance is an estimate for ranking.
+      </p>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_20rem]">
+        <UrgentTable data={data} />
+        <AlreadyAttacked data={data} />
+      </div>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Tab 2: How good is it?
+// ---------------------------------------------------------------------------
+
+function BigResult({ data }: { data: TimingData }) {
+  const { cox, cvss, difference } = data.results.main.post_kev
+  return (
+    <Card className={cn(difference.excludes_zero ? 'border-emerald-500/50' : 'border-border')}>
+      <CardHeader>
+        <CardDescription>Tested on past data that the model never saw</CardDescription>
+        <CardTitle className="text-xl leading-snug">
+          {difference.excludes_zero
+            ? 'Our ranking puts attacked vulnerabilities higher than CVSS does, and the difference is significant.'
+            : 'Our ranking is not significantly better than CVSS.'}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div>
+          <p className="text-muted-foreground">Our model (C-index)</p>
+          <p className="text-2xl font-semibold">{cox.c_index.toFixed(3)}</p>
+          <p className="text-xs text-muted-foreground">95% CI {ci(cox.c_index_ci)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">CVSS alone (C-index)</p>
+          <p className="text-2xl font-semibold">{cvss.c_index.toFixed(3)}</p>
+          <p className="text-xs text-muted-foreground">95% CI {ci(cvss.c_index_ci)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Difference</p>
+          <p className="text-2xl font-semibold">{signed(difference.difference)}</p>
+          <p className="text-xs text-muted-foreground">
+            95% CI {ci(difference.ci)} ({difference.excludes_zero ? 'excludes 0' : 'includes 0'})
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground sm:col-span-3">
+          C-index = how often the model puts the vulnerability that was attacked first above another one (0.5 =
+          guessing, 1 = perfect). Trained on data before {data.results.main_cutoff} ({cox.train_events} KEV
+          listings), tested on the next 365 days ({cox.test_events} listings), same 1,000 resamples for both.
+        </p>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -79,19 +203,16 @@ function DifferenceTable({ data }: { data: TimingData }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>C-index difference at every cut-off</CardTitle>
-        <CardDescription>
-          Survival model minus CVSS, on the same 1,000 bootstrap resamples. Every cut-off is shown, including the ones
-          where the model is not better.
-        </CardDescription>
+        <CardTitle>Every test date, including where it is not better</CardTitle>
+        <CardDescription>Our model minus CVSS. Greyed rows are not significant.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Cohort</TableHead>
-              <TableHead>Cut-off</TableHead>
-              <TableHead className="text-right">Train listings</TableHead>
+              <TableHead>Group</TableHead>
+              <TableHead>Trained up to</TableHead>
+              <TableHead className="text-right">Training listings</TableHead>
               <TableHead className="text-right">Difference</TableHead>
               <TableHead>95% CI</TableHead>
               <TableHead>Result</TableHead>
@@ -124,115 +245,25 @@ function DifferenceTable({ data }: { data: TimingData }) {
   )
 }
 
-function Curves({ data }: { data: TimingData }) {
-  const { kaplan_meier: km, bands } = data.results
-  const first = bands[0]
-  const later = bands[bands.length - 1]
-  const ratio = first.rate_per_day / later.rate_per_day
-  const second = bands[1]
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>Time to KEV listing (Kaplan–Meier)</CardTitle>
-          <CardDescription>
-            Post-KEV CVEs: {km.rows.toLocaleString()} CVEs, {km.events.toLocaleString()} listed in KEV
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <LineChart
-            points={km.points}
-            title="Share of CVEs not yet in KEV by days since publication"
-            xLabel="Days since publication"
-            yLabel="Not yet in KEV"
-            yDomain={zoomedDomain(km.points.map(([, value]) => value))}
-            formatY={(value) => `${(value * 100).toFixed(2)}%`}
-            zoomNote="Zoomed y-axis: it does not start at 0. Fewer than 1 in 100 CVEs are ever listed."
-          />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>When the risk is highest</CardTitle>
-          <CardDescription>
-            Baseline hazard of KEV listing per age band (listings per 100,000 average CVEs per day)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <BandsChart bands={bands} />
-          <p>
-            The first 30 days carry about <strong>{(first.rate_per_day / second.rate_per_day).toFixed(0)}×</strong>{' '}
-            the hazard of days 30–90, and about <strong>{ratio.toFixed(0)}×</strong> the hazard after{' '}
-            {bandLabel(later)}.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Each band has at least 10 training listings ({bands.map((band) => band.train_listings).join(', ')}). Model{' '}
-            {data.results.bands_model_version}.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function HazardRatios({ data }: { data: TimingData }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>What moves the risk (hazard ratios)</CardTitle>
-        <CardDescription>
-          Post-KEV cohort, cut-off {data.results.main_cutoff}. Above 1 means listed sooner. Relative effects, not
-          probabilities.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Feature</TableHead>
-              <TableHead className="text-right">Hazard ratio</TableHead>
-              <TableHead>95% CI</TableHead>
-              <TableHead className="text-right">p</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.results.hazard_ratios.map((row) => (
-              <TableRow key={row.feature} className={cn(row.p_value >= 0.05 && 'text-muted-foreground')}>
-                <TableCell>{row.label}</TableCell>
-                <TableCell className="text-right font-medium">{row.hazard_ratio.toFixed(2)}</TableCell>
-                <TableCell>{ci(row.ci, 2)}</TableCell>
-                <TableCell className="text-right">{row.p_value < 0.001 ? '< 0.001' : row.p_value.toFixed(3)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  )
-}
-
-type Open = { detail: TimingDetail; context: string }
-
-function Backtest({ data, onOpen }: { data: TimingData; onOpen: (open: Open) => void }) {
+function Backtest({ data }: { data: TimingData }) {
   const summary = data.backtest
-  const rows = [...summary.per_cve].sort((a, b) => a.b_rank - b.b_rank)
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Back-test: KEV additions after {day(summary.decision_time)}</CardTitle>
+        <CardTitle>A real month: September 2026</CardTitle>
         <CardDescription>
-          The model trained only on data before {day(summary.decision_time)}. {summary.listed} CVEs were added to KEV
-          in the next {summary.window_days} days; {summary.listed_published_after_decision} of them were published after
-          that date, so they could not be scored. {summary.scored} were scored, among{' '}
-          {summary.available_population.toLocaleString()} CVEs.
+          The model was trained only on data before {day(summary.decision_time)}. In the next {summary.window_days}{' '}
+          days, {summary.listed} vulnerabilities were added to KEV. {summary.listed_published_after_decision} of them
+          did not exist yet on that date; the other {summary.scored} were ranked among{' '}
+          {summary.available_population.toLocaleString()}.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-2">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Of the {summary.scored} scored, ranked in the…</TableHead>
-              <TableHead className="text-right">Survival model</TableHead>
+              <TableHead>Of the {summary.scored}, how many were in the…</TableHead>
+              <TableHead className="text-right">Our model</TableHead>
               <TableHead className="text-right">CVSS</TableHead>
             </TableRow>
           </TableHeader>
@@ -247,34 +278,81 @@ function Backtest({ data, onOpen }: { data: TimingData; onOpen: (open: Open) => 
           </TableBody>
         </Table>
         <p className="text-xs text-muted-foreground">
-          {summary.rank_note} One month and {summary.scored} CVEs: a small sample, shown as an illustration, not as a
-          result.
+          {summary.rank_note} One month and {summary.scored} vulnerabilities: an example, not proof.
         </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Curves({ data }: { data: TimingData }) {
+  const { kaplan_meier: km, bands } = data.results
+  const [first, second] = bands
+  const last = bands[bands.length - 1]
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>When the risk is highest</CardTitle>
+          <CardDescription>Risk of being added to KEV by age (per 100,000 vulnerabilities per day)</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <BandsChart bands={bands} />
+          <p>
+            The first 30 days carry about <strong>{(first.rate_per_day / second.rate_per_day).toFixed(0)}×</strong>{' '}
+            the risk of days 30–90, and about <strong>{(first.rate_per_day / last.rate_per_day).toFixed(0)}×</strong>{' '}
+            the risk after {bandLabel(last)}.
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>How many are ever listed</CardTitle>
+          <CardDescription>
+            {km.rows.toLocaleString()} vulnerabilities since KEV began; {km.events.toLocaleString()} were listed
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LineChart
+            points={km.points}
+            title="Share of vulnerabilities not yet in KEV, by days since publication"
+            xLabel="Days since publication"
+            yLabel="Not yet in KEV"
+            yDomain={zoomedDomain(km.points.map(([, value]) => value))}
+            formatY={(value) => `${(value * 100).toFixed(2)}%`}
+            zoomNote="Zoomed axis: it does not start at 0. Fewer than 1 in 100 are ever listed."
+          />
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function HazardRatios({ data }: { data: TimingData }) {
+  const rows = data.results.hazard_ratios.filter((row) => row.p_value < 0.05)
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>What makes a vulnerability more urgent</CardTitle>
+        <CardDescription>
+          Effects the model found with confidence (p &lt; 0.05). Above 1 = listed sooner, below 1 = later.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>CVE</TableHead>
-              <TableHead className="text-right">Model rank</TableHead>
-              <TableHead className="text-right">CVSS rank</TableHead>
-              <TableHead className="text-right">CVSS</TableHead>
+              <TableHead>Factor</TableHead>
+              <TableHead className="text-right">Effect on risk</TableHead>
+              <TableHead>95% CI</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
-              <TableRow
-                key={row.cve_id}
-                className="cursor-pointer"
-                onClick={() =>
-                  onOpen({
-                    detail: data.cves.backtest[row.cve_id],
-                    context: `Back-test at ${day(summary.decision_time)}`,
-                  })
-                }
-              >
-                <TableCell className="font-mono underline">{row.cve_id}</TableCell>
-                <TableCell className="text-right">{Math.round(row.b_rank).toLocaleString()}</TableCell>
-                <TableCell className="text-right">{Math.round(row.cvss_rank).toLocaleString()}</TableCell>
-                <TableCell className="text-right">{row.cvss?.toFixed(1) ?? '—'}</TableCell>
+              <TableRow key={row.feature}>
+                <TableCell>{row.label}</TableCell>
+                <TableCell className="text-right font-medium">× {row.hazard_ratio.toFixed(2)}</TableCell>
+                <TableCell>{ci(row.ci, 2)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -284,59 +362,8 @@ function Backtest({ data, onOpen }: { data: TimingData; onOpen: (open: Open) => 
   )
 }
 
-function TopTable({ data, onOpen }: { data: TimingData; onOpen: (open: Open) => void }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          Top {data.top.length} at {day(data.meta.decision_time)}
-        </CardTitle>
-        <CardDescription>
-          Highest 30-day estimates among CVEs not yet in KEV. Select a row for the detail.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-right">Rank</TableHead>
-              <TableHead>CVE</TableHead>
-              <TableHead>Published</TableHead>
-              <TableHead className="text-right">CVSS</TableHead>
-              <TableHead className="text-right">30-day estimate</TableHead>
-              <TableHead className="text-right">Exploits</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.top.map((id) => {
-              const detail = data.cves.current[id]
-              return (
-                <TableRow
-                  key={id}
-                  className="cursor-pointer"
-                  onClick={() => onOpen({ detail, context: `Current, ${day(data.meta.decision_time)}` })}
-                >
-                  <TableCell className="text-right">{detail.rank === null ? '—' : Math.round(detail.rank)}</TableCell>
-                  <TableCell className="font-mono underline">{id}</TableCell>
-                  <TableCell>{detail.published}</TableCell>
-                  <TableCell className="text-right">{detail.cvss?.toFixed(1) ?? '—'}</TableCell>
-                  <TableCell className="text-right">
-                    {detail.raw_30d === null ? statusLabels[detail.status] : `${(detail.raw_30d * 100).toFixed(3)}%`}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {detail.evidence.filter((item) => item.kind === 'exploit').length}
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  )
-}
-
 function Limitations({ data }: { data: TimingData }) {
+  const { cox, cvss } = data.results.main.post_kev
   return (
     <Card className="border-amber-500/40">
       <CardHeader>
@@ -346,69 +373,56 @@ function Limitations({ data }: { data: TimingData }) {
         <ul className="flex list-disc flex-col gap-1 pl-5">
           <li>{data.meta.note}</li>
           <li>
-            The model ranks the whole list better than CVSS, but its top 100 is not better: P@100 is{' '}
-            {data.results.main.post_kev.cox.p_at_100.toFixed(2)} against{' '}
-            {data.results.main.post_kev.cvss.p_at_100.toFixed(2)} for CVSS.
+            The whole ranking is better than CVSS, but the very top is not: of the top 100, {cox.p_at_100.toFixed(2)}{' '}
+            were listed, against {cvss.p_at_100.toFixed(2)} for CVSS.
           </li>
-          <li>
-            The early post-KEV cut-offs (2022–2023) have too few KEV listings to train on (fewer than 100); they are
-            reported, not used as results.
-          </li>
-          <li>
-            The 30-day estimate is a ranking score: its calibration has not been checked, so it is not a probability.
-          </li>
-          <li>KEV listing is not the first attack; it is a public, dated record of exploitation.</li>
+          <li>The earliest test dates (2022–2023) had fewer than 100 KEV listings to learn from.</li>
+          <li>The 30-day chance is a ranking estimate; it has not been checked as a true probability.</li>
+          <li>Being added to KEV is not the first attack; it is the first public, dated record of one.</li>
         </ul>
       </CardContent>
     </Card>
   )
 }
 
+function ProofTab({ data }: { data: TimingData }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <BigResult data={data} />
+      <DifferenceTable data={data} />
+      <Backtest data={data} />
+      <Curves data={data} />
+      <HazardRatios data={data} />
+      <Limitations data={data} />
+      <p className="text-xs text-muted-foreground">
+        Model {data.meta.model_version} · data snapshot {data.meta.snapshot_date} · generated{' '}
+        {day(data.meta.generated_at)}
+      </p>
+    </div>
+  )
+}
+
 export function TimingPage() {
   const state = useTimingData()
-  const [open, setOpen] = useState<Open | null>(null)
-
-  if (state.status === 'loading') return <p className="text-muted-foreground">Loading exploit timing results…</p>
+  if (state.status === 'loading') return <p className="text-muted-foreground">Loading exploit timing…</p>
   if (state.status === 'error') return <MissingDataCard message={state.message} />
   const { data } = state
 
-  if (open) {
-    return (
-      <div className="flex max-w-3xl flex-col gap-4">
-        <Button variant="outline" size="sm" className="self-start" onClick={() => setOpen(null)}>
-          Back to results
-        </Button>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex flex-wrap items-center gap-2 font-mono">
-              {open.detail.cve_id} <RetrospectiveLabel />
-            </CardTitle>
-            <CardDescription>{open.context}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TimingDetailView detail={open.detail} />
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <Tabs defaultValue="urgent" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <TabsList>
+          <TabsTrigger value="urgent">Urgent list</TabsTrigger>
+          <TabsTrigger value="proof">How good is it?</TabsTrigger>
+        </TabsList>
         <RetrospectiveLabel />
-        <span className="text-muted-foreground">
-          Model {data.meta.model_version} · horizon {data.meta.horizon_days} days · data snapshot{' '}
-          {data.meta.snapshot_date} · generated {day(data.meta.generated_at)}
-        </span>
       </div>
-      <Headline data={data} />
-      <DifferenceTable data={data} />
-      <Curves data={data} />
-      <HazardRatios data={data} />
-      <Backtest data={data} onOpen={setOpen} />
-      <TopTable data={data} onOpen={setOpen} />
-      <Limitations data={data} />
-    </div>
+      <TabsContent value="urgent">
+        <UrgentTab data={data} />
+      </TabsContent>
+      <TabsContent value="proof">
+        <ProofTab data={data} />
+      </TabsContent>
+    </Tabs>
   )
 }

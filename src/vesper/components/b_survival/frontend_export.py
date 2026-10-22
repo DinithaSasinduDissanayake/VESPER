@@ -20,6 +20,15 @@ time), and the results come from the files written by evaluate.
             (every CVE added to KEV in the HORIZON_DAYS days after it)
   backtest  how many of the CVEs added to KEV after the back-test decision time
             were in B's top 1% / 5% / 10% at that time, and the same for CVSS
+  recent_kev  CVEs added to KEV in the HORIZON_DAYS days BEFORE the current
+            decision time ("already attacked: patch these first")
+
+For the plain-language screen every CVE also gets a level (High = top 5% of the
+scored CVEs by percentile, Medium = next 15%, Low = the rest; LEVEL_CUTOFFS),
+its vendor, product and a short description from the raw NVD files, and two to
+four plain sentences that explain the level. The sentences follow fixed rules
+from the facts the card already shows (rank, age, exploits before the decision
+time, CVSS, CWE hazard ratio); nothing new is modelled.
 
 Evidence for a CVE is only what was dated BEFORE its decision time: the
 publication day and Exploit-DB exploits. A KEV listing on or after the decision
@@ -29,12 +38,15 @@ as evidence.
 Input:   data/processed/b_survival/survival_table.csv, exploitdb_clean.csv
          outputs/b_survival/models/metrics.csv, c_index_differences.csv,
          hazard_ratios.csv   (run evaluate first)
+         data/raw/nvd/nvd_<month>.json.gz   (vendor, product, description)
+         data/raw/kev/kev_<snapshot date>.json   (names of recent KEV additions)
 Output:  frontend/public/demo/exploit_timing.json
 
 Run from anywhere:
     uv run python -m vesper.components.b_survival.frontend_export
 """
 
+import gzip
 import json
 import re
 from datetime import UTC, date, datetime
@@ -76,6 +88,11 @@ KM_MAX_DAYS = 730
 KM_MAX_POINTS = 200
 TOP_SHARES = (0.01, 0.05, 0.10)
 EXPLOITDB_URL = "https://www.exploit-db.com/exploits/{}"
+NVD_URL = "https://nvd.nist.gov/vuln/detail/{}"
+# Level by percentile among the scored CVEs: High = top 5%, Medium = next 15%
+LEVEL_CUTOFFS = (("High", 0.95), ("Medium", 0.80))
+RECENT_KEV_LIMIT = 10
+DESCRIPTION_CHARS = 220
 
 RETROSPECTIVE_NOTE = (
     "Retrospective: CVSS and CWE are the current NVD values, not as they were at the "
@@ -119,11 +136,10 @@ class Scored:
             }
         ).set_index("cve_id")
         available = self.frame["status"] == ScoreStatus.AVAILABLE.value
-        # Rank 1 = highest raw estimate among the available CVEs; tied CVEs share
-        # the average rank, as in the back-test summary
-        self.frame["rank"] = self.frame.loc[available, "raw"].rank(
-            ascending=False, method="average"
-        )
+        # Rank shown on screen: 1 = highest raw estimate among the available CVEs;
+        # tied CVEs share the same number (1, 2, 2, 4). The back-test summary uses
+        # average ranks instead, to be fair to CVSS's many ties.
+        self.frame["rank"] = self.frame.loc[available, "raw"].rank(ascending=False, method="min")
         self.available_count = int(available.sum())
         train_features = self.model.features(self.train)
         self.feature_means = train_features.mean()
@@ -228,7 +244,7 @@ def cve_detail(scored, table_row, exploits):
         "reason": score["reason"],
         "raw_30d": number(score["raw"], 8) if available else None,
         "percentile": number(score["percentile"]) if available else None,
-        "rank": round(float(score["rank"]), 1) if available else None,
+        "rank": int(score["rank"]) if available else None,
         "rank_of": scored.available_count,
         "survival": survival_curve(scored, row, age) if available else None,
         "evidence": evidence,
@@ -422,6 +438,158 @@ def backtest_summary(table, scored, listed_ids):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Plain-language additions: level, product, reasons, recent KEV additions
+# ---------------------------------------------------------------------------
+
+
+def level_of(percentile):
+    """High / Medium / Low from the percentile (None when there is no score)."""
+    if percentile is None or pd.isna(percentile):
+        return None
+    for name, cutoff in LEVEL_CUTOFFS:
+        if percentile >= cutoff:
+            return name
+    return "Low"
+
+
+def short_text(text, limit=DESCRIPTION_CHARS):
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rsplit(" ", 1)[0] + "…"
+
+
+def known(value):
+    """False for an empty vendor or product, or the "n/a" that some NVD records use."""
+    return bool(value) and str(value).strip().lower() not in {"n/a", "na", "-", "unknown"}
+
+
+def load_nvd_info(nvd_dir, table, cve_ids):
+    """Vendor, product and a short description per CVE, from the raw NVD files.
+
+    Only the monthly files in which these CVEs were published are read.
+    """
+    wanted = set(cve_ids)
+    months = sorted(
+        set(table.loc[table["cve_id"].isin(wanted), "published_at"].dt.strftime("%Y-%m"))
+    )
+    info = {}
+    for month in months:
+        path = nvd_dir / f"nvd_{month}.json.gz"
+        if not path.exists():
+            continue
+        with gzip.open(path, "rt", encoding="utf-8") as file:
+            records = json.load(file)["vulnerabilities"]
+        for record in records:
+            cve = record["cve"]
+            if cve["id"] not in wanted:
+                continue
+            english = [d["value"] for d in cve.get("descriptions", []) if d.get("lang") == "en"]
+            affected = [
+                item
+                for block in cve.get("affected", [])
+                for item in block.get("affectedData", [])
+                if known(item.get("vendor")) or known(item.get("product"))
+            ]
+            first = affected[0] if affected else {}
+            info[cve["id"]] = {
+                "vendor": first.get("vendor") if known(first.get("vendor")) else None,
+                "product": first.get("product") if known(first.get("product")) else None,
+                "description": short_text(english[0]) if english else None,
+            }
+    return info
+
+
+def first_month_ratio(bands):
+    """Baseline hazard of the first age band against the second."""
+    if len(bands) < 2 or bands[1]["rate_per_day"] <= 0:
+        return None
+    return bands[0]["rate_per_day"] / bands[1]["rate_per_day"]
+
+
+def plain_reasons(detail, ratio):
+    """One to four short sentences that explain the level, by fixed rules."""
+    if detail["status"] == ScoreStatus.ALREADY_EXPLOITED.value:
+        return [
+            "Already in the CISA list of attacked vulnerabilities (KEV) since "
+            f"{detail['kev']['date']}. Patch it now."
+        ]
+    if detail["status"] != ScoreStatus.AVAILABLE.value:
+        return [f"No score: {detail['reason']}"]
+
+    top_share = 1 - detail["percentile"]
+    share = "top 1%" if top_share < 0.01 else f"top {top_share * 100:.0f}%"
+    reasons = [
+        f"{detail['level']}: #{round(detail['rank']):,} of {detail['rank_of']:,} vulnerabilities "
+        f"not yet attacked ({share})."
+    ]
+    if detail["age_days"] <= 30:
+        days = detail["age_days"]
+        reason = f"It is new: published {days} day{'' if days == 1 else 's'} ago."
+        if ratio:
+            reason += f" In the first 30 days the risk is about {ratio:.0f}× the next two months."
+        reasons.append(reason)
+    exploits = [item for item in detail["evidence"] if item["kind"] == "exploit"]
+    if any(f["feature"] == "exploit_at_publication" for f in detail["factors"]):
+        reasons.append("Public exploit code was available on the day it was published.")
+    elif exploits:
+        reasons.append(f"Public exploit code appeared on {exploits[0]['date']}.")
+    cvss = detail["cvss"]
+    if cvss is not None and cvss >= 9:
+        reasons.append(f"Its severity is critical (CVSS {cvss:.1f}).")
+    elif cvss is not None and cvss >= 7:
+        reasons.append(f"Its severity is high (CVSS {cvss:.1f}).")
+    raising = [
+        f for f in detail["factors"] if f["feature"].startswith("cwe=") and f["hazard_ratio"] > 1.1
+    ]
+    if raising:
+        reasons.append(
+            f"Its weakness type ({raising[0]['label']}) is attacked more often than average."
+        )
+    return reasons[:4]
+
+
+def add_plain_fields(detail, nvd_info, ratio):
+    """Add level, NVD link, vendor, product, description and reasons to one CVE."""
+    detail["level"] = level_of(detail["percentile"])
+    detail["nvd_url"] = NVD_URL.format(detail["cve_id"])
+    detail.update(
+        nvd_info.get(detail["cve_id"], {"vendor": None, "product": None, "description": None})
+    )
+    detail["reasons"] = plain_reasons(detail, ratio)
+    return detail
+
+
+def recent_kev(kev_records, decision_time, days=HORIZON_DAYS, limit=RECENT_KEV_LIMIT):
+    """CVEs added to KEV in the `days` days before the decision time, newest first."""
+    decision_day = pd.Timestamp(decision_time).normalize()
+    first = decision_day - pd.Timedelta(days=days)
+    items = []
+    for record in kev_records:
+        added = pd.Timestamp(record["dateAdded"], tz="UTC")
+        if first <= added < decision_day:
+            items.append(
+                {
+                    "cve_id": record["cveID"],
+                    "date_added": added.date().isoformat(),
+                    "vendor": record.get("vendorProject"),
+                    "product": record.get("product"),
+                    "name": record.get("vulnerabilityName"),
+                    "nvd_url": NVD_URL.format(record["cveID"]),
+                }
+            )
+    items.sort(key=lambda item: (item["date_added"], item["cve_id"]), reverse=True)
+    return {"window_days": days, "count": len(items), "items": items[:limit]}
+
+
+def load_kev_records(kev_dir, snapshot_date=SNAPSHOT_DATE):
+    """The KEV catalogue file of the snapshot ([] if it is missing)."""
+    path = kev_dir / f"kev_{snapshot_date.isoformat()}.json"
+    if not path.exists():
+        return []
+    return json.loads(path.read_text(encoding="utf-8"))["vulnerabilities"]
+
+
 def sample_queue_ids(path):
     """CVE IDs in the frontend's sample queue file."""
     if not path.exists():
@@ -435,7 +603,7 @@ def load_exploits(path):
     return exploits
 
 
-def build_export(table, exploits, models_dir, sample_ids):
+def build_export(table, exploits, models_dir, sample_ids, nvd_dir=None, kev_records=()):
     """The whole JSON document as a dictionary."""
     current = Scored(table, CURRENT_DECISION)
     backtest = Scored(table, BACKTEST_DECISION)
@@ -445,6 +613,23 @@ def build_export(table, exploits, models_dir, sample_ids):
     top_ids = available.sort_values("raw", ascending=False).head(TOP_N).index.tolist()
     current_ids = [i for i in dict.fromkeys(sample_ids + top_ids) if i in by_id.index]
     listed_ids = listed_in_window(table, BACKTEST_DECISION)
+    results = {**evaluate_results(models_dir, current), "kaplan_meier": kaplan_meier_points(table)}
+    current_details = {i: cve_detail(current, by_id.loc[i], exploits) for i in current_ids}
+    backtest_details = {
+        i: cve_detail(backtest, by_id.loc[i], exploits)
+        for i in listed_ids
+        if i in backtest.frame.index
+    }
+    nvd_info = (
+        load_nvd_info(nvd_dir, table, list(current_details) + list(backtest_details))
+        if nvd_dir
+        else {}
+    )
+    ratio = first_month_ratio(results["bands"])
+    for details in (current_details, backtest_details):
+        for detail in details.values():
+            add_plain_fields(detail, nvd_info, ratio)
+    levels = current.frame["percentile"].map(level_of)
 
     return {
         "meta": {
@@ -462,20 +647,16 @@ def build_export(table, exploits, models_dir, sample_ids):
             "note": RETROSPECTIVE_NOTE,
             "sample_queue_missing": [i for i in sample_ids if i not in by_id.index],
         },
-        "results": {
-            **evaluate_results(models_dir, current),
-            "kaplan_meier": kaplan_meier_points(table),
+        "results": results,
+        "levels": {
+            "rule": "High = top 5% of scored vulnerabilities, Medium = next 15%, Low = the rest",
+            "cutoffs": dict(LEVEL_CUTOFFS),
+            "counts": {name: int((levels == name).sum()) for name in ("High", "Medium", "Low")},
         },
         "top": top_ids,
-        "cves": {
-            "current": {i: cve_detail(current, by_id.loc[i], exploits) for i in current_ids},
-            "backtest": {
-                i: cve_detail(backtest, by_id.loc[i], exploits)
-                for i in listed_ids
-                if i in backtest.frame.index
-            },
-        },
+        "cves": {"current": current_details, "backtest": backtest_details},
         "backtest": backtest_summary(table, backtest, listed_ids),
+        "recent_kev": recent_kev(kev_records, current.decision_time),
     }
 
 
@@ -490,7 +671,14 @@ def main(settings=None):
     root = settings.project_root
     sample_ids = sample_queue_ids(root.joinpath(*SAMPLE_QUEUE_PARTS))
 
-    document = build_export(table, exploits, models_dir, sample_ids)
+    document = build_export(
+        table,
+        exploits,
+        models_dir,
+        sample_ids,
+        nvd_dir=settings.raw_source("nvd"),
+        kev_records=load_kev_records(settings.raw_source("kev")),
+    )
     output = root.joinpath(*OUTPUT_PARTS)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(document, indent=1), encoding="utf-8", newline="\n")

@@ -11,8 +11,12 @@ from vesper.components.b_survival.frontend_export import (
     BACKTEST_DECISION,
     Scored,
     build_export,
+    known,
+    level_of,
     listed_in_window,
     main,
+    plain_reasons,
+    recent_kev,
 )
 from vesper.components.b_survival.survival_table import OUTPUT_COLUMNS
 from vesper.config import load_settings
@@ -138,7 +142,15 @@ def document(table, exploits, tmp_path_factory):
 
 
 def test_the_document_has_the_expected_keys(document):
-    assert set(document) == {"meta", "results", "top", "cves", "backtest"}
+    assert set(document) == {
+        "meta",
+        "results",
+        "levels",
+        "top",
+        "cves",
+        "backtest",
+        "recent_kev",
+    }
     assert document["meta"]["model_version"].endswith("-0.2")
     assert document["meta"]["horizon_days"] == 30
     assert "current NVD" in document["meta"]["note"]
@@ -227,3 +239,83 @@ def test_main_writes_the_json_in_the_frontend_folder(table, exploits, tmp_path):
         json.loads(path.read_text(encoding="utf-8"))["meta"]["snapshot_date"]
         == date(2026, 10, 1).isoformat()
     )
+
+
+# --- Plain-language fields -----------------------------------------------------
+
+
+def test_levels_follow_the_rank_cutoffs():
+    assert [level_of(p) for p in (1.0, 0.95, 0.9499, 0.80, 0.7999, 0.01)] == [
+        "High",
+        "High",
+        "Medium",
+        "Medium",
+        "Low",
+        "Low",
+    ]
+    assert level_of(None) is None
+
+
+def test_every_cve_has_a_level_and_reasons(document):
+    for detail in document["cves"]["current"].values():
+        assert detail["reasons"]
+        if detail["status"] == "available":
+            assert detail["level"] == level_of(detail["percentile"])
+            assert detail["reasons"][0].startswith(detail["level"])
+        else:
+            assert detail["level"] is None
+    counts = document["levels"]["counts"]
+    total = sum(counts.values())
+    assert counts["High"] == pytest.approx(0.05 * total, abs=2)
+
+
+def test_reasons_follow_the_facts():
+    detail = {
+        "status": "available",
+        "level": "High",
+        "percentile": 0.999,
+        "rank": 3.0,
+        "rank_of": 1000,
+        "age_days": 1,
+        "cvss": 9.8,
+        "evidence": [{"kind": "exploit", "date": "2026-09-20"}],
+        "factors": [{"feature": "cwe=CWE-22", "label": "CWE-22", "hazard_ratio": 1.2}],
+    }
+
+    reasons = plain_reasons(detail, ratio=8.0)
+
+    assert reasons[0] == "High: #3 of 1,000 vulnerabilities not yet attacked (top 1%)."
+    assert reasons[1].startswith("It is new: published 1 day ago.")
+    assert "8×" in reasons[1]
+    assert "appeared on 2026-09-20" in reasons[2]
+    assert "critical (CVSS 9.8)" in reasons[3]
+    assert len(reasons) == 4
+
+
+def test_an_already_exploited_cve_says_patch_now():
+    detail = {"status": "already_exploited", "kev": {"date": "2023-02-10"}}
+
+    assert plain_reasons(detail, ratio=8.0) == [
+        "Already in the CISA list of attacked vulnerabilities (KEV) since 2023-02-10. Patch it now."
+    ]
+
+
+def test_recent_kev_only_holds_additions_before_the_decision_time():
+    records = [
+        {"cveID": "CVE-2026-0001", "dateAdded": "2026-08-31"},  # before the window
+        {"cveID": "CVE-2026-0002", "dateAdded": "2026-09-01"},
+        {"cveID": "CVE-2026-0003", "dateAdded": "2026-09-30"},
+        {"cveID": "CVE-2026-0004", "dateAdded": "2026-10-01"},  # on the decision day
+    ]
+
+    recent = recent_kev(records, pd.Timestamp("2026-10-01", tz="UTC"))
+
+    assert [item["cve_id"] for item in recent["items"]] == ["CVE-2026-0003", "CVE-2026-0002"]
+    assert recent["count"] == 2
+
+
+def test_known_rejects_placeholder_vendor_names():
+    assert known("Apache Software Foundation")
+    assert not known("n/a")
+    assert not known("")
+    assert not known(None)
