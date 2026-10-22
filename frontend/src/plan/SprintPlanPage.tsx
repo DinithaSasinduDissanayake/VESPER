@@ -184,7 +184,7 @@ export function SprintPlanPage() {
         <div className="flex flex-col gap-1">
           <p className="text-muted-foreground">Fusion · Risk ranking and patch planning</p>
           <h2 className="text-2xl font-semibold tracking-tight">Sprint planner</h2>
-          <p className="max-w-3xl text-sm text-muted-foreground">
+          <p className="max-w-3xl text-base text-muted-foreground">
             Review the provisional five-signal ranking, then schedule patches within the team’s daily capacity.
           </p>
         </div>
@@ -235,8 +235,8 @@ export function SprintPlanPage() {
                   <p className="text-sm text-muted-foreground">
                     {ranking.count.toLocaleString()} CVEs · {ranking.ranking_model ?? 'method unspecified'}
                   </p>
-                  <p className="text-xs text-muted-foreground">As of {source?.data_as_of ?? '—'}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">As of {source?.data_as_of ?? '—'}</p>
+                  <p className="text-sm text-muted-foreground">
                     Text {source?.snapshot_date_a ?? '—'} · Timing {source?.snapshot_date_b ?? '—'} · Exposure {source?.snapshot_date_c ?? '—'} · CVSS {source?.baseline_snapshot_date ?? '—'} · EPSS {source?.epss_date ?? '—'}
                   </p>
                 </>
@@ -267,7 +267,7 @@ export function SprintPlanPage() {
               <div className="rounded-lg bg-muted p-3">
                 Daily capacity <strong>{(patchers * hoursPerPatcher).toLocaleString()} person-hours</strong>
               </div>
-              <p className="text-xs text-muted-foreground">Current plan value is risk score × business criticality (defaults to 1). CVSS severity tier provides a labeled effort estimate; it is not measured patch time.</p>
+              <p className="text-sm text-muted-foreground">Current plan value is risk score × business criticality (defaults to 1). CVSS severity tier provides a labeled effort estimate; it is not measured patch time.</p>
               <div className="flex flex-col gap-2">
                 <Button onClick={() => buildPlan('day')} disabled={!ranking || rankingLoading || planning}>{planning ? 'Planning…' : 'Build daily plan'}</Button>
                 <Button variant="secondary" onClick={() => buildPlan('week')} disabled={!ranking || rankingLoading || planning}>Build weekly plan</Button>
@@ -315,20 +315,20 @@ export function SprintPlanPage() {
                   Search CVE ID
                   <Input className="w-48" type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0) }} placeholder="CVE-YYYY-NNNN" />
                 </label>
-                {view === 'plan' && <span className="text-xs text-muted-foreground">Daily knapsack is rerun on remaining CVEs for each workday.</span>}
+                {view === 'plan' && <span className="text-sm text-muted-foreground">Daily knapsack is rerun on remaining CVEs for each workday.</span>}
               </div>
             )}
             {rankingLoading || planning ? (
-              <p className="py-10 text-center text-sm text-muted-foreground" role="status">{rankingLoading ? 'Loading ranking…' : 'Optimizing patch schedule…'}</p>
+              <p className="py-10 text-center text-base text-muted-foreground" role="status">{rankingLoading ? 'Loading ranking…' : 'Optimizing patch schedule…'}</p>
             ) : !ranking ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">Load the backend ranking to start.</p>
+              <p className="py-10 text-center text-base text-muted-foreground">Load the backend ranking to start.</p>
             ) : view === 'plan' && !plan ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">Choose a daily, weekly, or monthly plan.</p>
+              <p className="py-10 text-center text-base text-muted-foreground">Choose a daily, weekly, or monthly plan.</p>
             ) : filteredRows.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">No CVEs match this search.</p>
+              <p className="py-10 text-center text-base text-muted-foreground">No CVEs match this search.</p>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="[&_td]:py-2.5">
                   <TableHeader><TableRow>
                     {view === 'plan' && <TableHead>Status / date</TableHead>}
                     <TableHead>Risk rank</TableHead><TableHead>CVE</TableHead>
@@ -416,7 +416,7 @@ export function SprintPlanPage() {
           </CardContent>
         </Card>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Ranking score and schedule are distinct: the ranking orders risk signals; the planner selects the highest-value feasible tasks under each day’s estimated effort capacity. Multi-day plans run the daily optimizer in sequence and do not model dependencies, holidays, or task concurrency.
       </p>
     </div>
