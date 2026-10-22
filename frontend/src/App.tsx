@@ -56,8 +56,8 @@ function App() {
   const goTo = setActiveId
 
   return (
-    <div className="app-backdrop flex min-h-svh bg-background">
-      <aside className="relative flex w-64 shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-xl shadow-blue-950/10">
+    <div className="app-backdrop flex min-h-svh flex-col bg-background md:flex-row">
+      <aside className="relative flex w-full shrink-0 flex-col overflow-hidden border-b border-sidebar-border bg-sidebar text-sidebar-foreground shadow-xl shadow-blue-950/10 md:w-64 md:border-r md:border-b-0">
         <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-blue-400/10 blur-3xl" />
         <button
           type="button"
@@ -75,7 +75,7 @@ function App() {
           </span>
         </button>
 
-        <nav aria-label="Main" className="flex flex-1 flex-col gap-1.5 p-3 pt-5">
+        <nav aria-label="Main" className="flex flex-1 flex-wrap gap-1.5 p-3 md:flex-col md:flex-nowrap md:pt-5">
           {mainNav.map((id) => (
             <NavItem key={id} id={id} activeId={activeId} onSelect={goTo} />
           ))}
@@ -101,7 +101,7 @@ function App() {
         </header>
 
         {/* key resets the page's state (e.g. the open CVE) when the page changes. */}
-        <main className="flex-1 p-5 text-sm md:p-7">
+        <main className="min-w-0 flex-1 p-3 text-sm sm:p-5 md:p-7">
           {activeId === 'home' ? (
             <HomePage key={activeId} onNavigate={goTo} />
           ) : (

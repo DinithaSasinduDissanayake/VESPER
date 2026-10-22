@@ -3,10 +3,28 @@ import { ArrowLeft, ExternalLink, ShieldAlert } from 'lucide-react'
 import { getCveDetails, type PlannerCandidate, type VulnerabilityFacts } from '@/api/queue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ExposureSection } from '@/exposure/ExposureSection'
+import { sampleStructuralDetails, sampleStructuralState } from '@/exposure/sampleStructuralDetails'
+import type { StructuralDetails, StructuralDetailsState } from '@/exposure/types'
 
 type CveDetailProps = {
   candidate: PlannerCandidate
   onBack: () => void
+}
+
+// Same rule as structuralStateForQueueItem, read from the planner row's C fields.
+function structuralStateForCandidate(candidate: PlannerCandidate): StructuralDetailsState {
+  const data = sampleStructuralDetails(candidate.cve_id, candidate.score_c ?? 0.97)
+  if (candidate.status_c !== 'available' || candidate.score_c === null) {
+    const unavailable = sampleStructuralState(candidate.status_c === 'not_eligible' ? 'not_eligible' : 'unavailable')
+    if (unavailable.state === 'loaded') {
+      unavailable.data.cveId = data.cveId
+      unavailable.data.structuralScore.status = (candidate.status_c ?? 'unavailable') as StructuralDetails['structuralScore']['status']
+      unavailable.data.structuralScore.reason = candidate.reason_c ?? 'No sample structural score supplied.'
+      return unavailable
+    }
+  }
+  return { state: 'loaded', data }
 }
 
 function displayScore(value: number | null, digits = 3) {
@@ -125,6 +143,10 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
             )) : <p className="text-sm text-muted-foreground">No CWE identifiers are recorded.</p>}
           </CardContent>
         </Card>
+
+        <div className="min-w-0 lg:col-span-2">
+          <ExposureSection resource={structuralStateForCandidate(candidate)} />
+        </div>
       </div>
 
       <Card className="border-blue-100/80 shadow-sm dark:border-blue-900/60">
