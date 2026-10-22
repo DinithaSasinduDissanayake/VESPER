@@ -584,6 +584,99 @@ prints the model, the rows per status and the raw score distribution. The
 percentile distribution is in `b_exploit_timing_scores.csv.metadata.json`
 (min 0.086, median 0.500, max 1.0).
 
+## 17. Historical score snapshots for Component D
+
+**What I did.** Component D needs past B scores to train and evaluate fusion.
+`score_history` replays B at each decision time T of a grid, using only data
+dated before T, and writes one pair of files per T. The numbers below are
+printed by `score_history` and stored in `history.metadata.json` (run-001).
+
+**Decision grid.** 00:00 UTC on the 1st of each month, 2024-07-01 to
+2026-09-01: 27 dates (`DECISION_DATES`, or `--decision-times` on the command
+line). Reasons:
+
+- Start 2024-07-01: before it, the post_kev train sets are small (5, 47, 79
+  and 216 events at the four cut-offs of section 12; only 2024-01-01 reaches
+  `MIN_TRAIN_EVENTS`). At 2024-07-01 the train set has 275 events.
+- End 2026-09-01: D's label window is T + 30 days, and it must end by the
+  snapshot (2026-10-01). `check_grid` refuses any later date.
+
+**Method, for each T.**
+
+1. Fit the Cox model on post_kev CVEs published before T, re-censored at T,
+   with exploit dates on or after T removed (the rules of section 12, through
+   `split_data.split_at_cutoff`). `trained_through` = T.
+2. Score every study CVE published before T with the export rules of
+   section 16: the conditional 30-day estimate with age measured at T, and the
+   same statuses and reasons. A CVE listed in KEV before T is
+   `already_exploited`; one listed on or after T is scored normally.
+3. Rank the raw estimates among the CVEs available at that T (rank / N, ties
+   share the average rank).
+
+`model_version` is `b_survival-cox-percentile-<T>-0.1` (percentile) and
+`b_survival-cox-<T>-0.1` (raw). `snapshot_date` is 2026-10-01 for every row.
+B does not label: D adds `kev_within_horizon`.
+
+**Output format.** The two history files would be 1.19 GB (percentile) and
+1.13 GB (raw) as single CSVs, 5.89 million rows each. A single file would also
+fail D's per-CVE check, which allows one row per CVE ID. So each T gets its own
+pair of CSVs (25-60 MB each), sorted by `cve_id`, which pass D's check
+unchanged. Each run gets a new folder `history/run-NNN`; an existing run is
+never overwritten.
+
+**Numbers per decision time (run-001).**
+
+| Decision time | Train rows | Train events | Rows | Available | Abstained | Already exploited | Not eligible | Raw = 0 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2024-07-01 | 77,459 | 275 | 167,645 | 75,730 | 1,505 | 956 | 89,454 | 23,210 (30.6%) |
+| 2024-08-01 | 80,538 | 288 | 170,758 | 78,796 | 1,539 | 969 | 89,454 | 25,197 (32.0%) |
+| 2024-09-01 | 83,408 | 303 | 173,654 | 81,651 | 1,565 | 988 | 89,450 | 25,171 (30.8%) |
+| 2024-10-01 | 85,903 | 316 | 176,168 | 84,133 | 1,584 | 1,009 | 89,442 | 24,704 (29.4%) |
+| 2024-11-01 | 89,411 | 333 | 179,732 | 87,624 | 1,640 | 1,026 | 89,442 | 28,023 (32.0%) |
+| 2024-12-01 | 93,395 | 351 | 183,788 | 91,591 | 1,710 | 1,047 | 89,440 | 27,821 (30.4%) |
+| 2025-01-01 | 96,745 | 364 | 187,219 | 94,928 | 1,790 | 1,063 | 89,438 | 27,946 (29.4%) |
+| 2025-02-01 | 100,956 | 376 | 191,494 | 99,127 | 1,854 | 1,077 | 89,436 | 30,381 (30.6%) |
+| 2025-03-01 | 104,562 | 398 | 195,167 | 102,711 | 1,921 | 1,104 | 89,431 | 29,293 (28.5%) |
+| 2025-04-01 | 108,435 | 426 | 199,165 | 106,556 | 2,046 | 1,136 | 89,427 | 28,032 (26.3%) |
+| 2025-05-01 | 112,353 | 440 | 203,199 | 110,460 | 2,162 | 1,151 | 89,426 | 31,366 (28.4%) |
+| 2025-06-01 | 116,200 | 464 | 207,179 | 114,283 | 2,295 | 1,175 | 89,426 | 28,441 (24.9%) |
+| 2025-07-01 | 119,744 | 482 | 210,860 | 117,809 | 2,432 | 1,195 | 89,424 | 28,868 (24.5%) |
+| 2025-08-01 | 123,274 | 498 | 214,636 | 121,323 | 2,678 | 1,215 | 89,420 | 29,964 (24.7%) |
+| 2025-09-01 | 126,620 | 507 | 218,264 | 124,660 | 2,958 | 1,228 | 89,418 | 29,998 (24.1%) |
+| 2025-10-01 | 130,780 | 520 | 222,585 | 128,807 | 3,118 | 1,244 | 89,416 | 30,344 (23.6%) |
+| 2025-11-01 | 134,707 | 542 | 226,858 | 132,712 | 3,464 | 1,269 | 89,413 | 29,048 (21.9%) |
+| 2025-12-01 | 137,505 | 552 | 229,879 | 135,500 | 3,687 | 1,280 | 89,412 | 30,223 (22.3%) |
+| 2026-01-01 | 142,125 | 566 | 235,371 | 140,106 | 4,555 | 1,300 | 89,410 | 31,644 (22.6%) |
+| 2026-02-01 | 146,179 | 581 | 239,673 | 144,145 | 4,803 | 1,316 | 89,409 | 34,032 (23.6%) |
+| 2026-03-01 | 150,594 | 605 | 244,289 | 148,536 | 5,004 | 1,343 | 89,406 | 32,001 (21.5%) |
+| 2026-04-01 | 156,723 | 628 | 250,523 | 154,642 | 5,109 | 1,369 | 89,403 | 32,524 (21.0%) |
+| 2026-05-01 | 162,404 | 656 | 256,333 | 160,295 | 5,238 | 1,398 | 89,402 | 31,108 (19.4%) |
+| 2026-06-01 | 168,955 | 672 | 263,270 | 166,830 | 5,624 | 1,414 | 89,402 | 32,769 (19.6%) |
+| 2026-07-01 | 176,378 | 695 | 271,212 | 174,230 | 6,143 | 1,437 | 89,402 | 34,934 (20.1%) |
+| 2026-08-01 | 185,400 | 720 | 280,982 | 183,227 | 6,891 | 1,462 | 89,402 | 38,086 (20.8%) |
+| 2026-09-01 | 195,945 | 747 | 293,240 | 193,745 | 8,603 | 1,491 | 89,401 | 32,867 (17.0%) |
+
+Run time: 207 s with 3 parallel workers (about 20 s and 0.8 GB per decision
+time). The 2.3 GB of output is in `outputs/`, which git ignores.
+
+**What cannot be reconstructed (limits).**
+
+- **Retrospective replay, not a point-in-time record.** The NVD fields (CVSS
+  score and vector, CWE) come from the current NVD snapshot, not as they were
+  at T. A CVSS score that NVD added or changed after T is used at T, so some
+  information from after T leaks into the inputs. The same applies to which
+  CVEs have no CVSS (abstained).
+- **KEV and Exploit-DB dates are used as dated.** A KEV entry or Exploit-DB
+  record deleted before the snapshot is missing, and a backdated entry cannot
+  be detected.
+- **Raw estimates of exactly 0 (section 16) at every T,** 17-32% of the
+  available CVEs (last column). They tie at the bottom of the percentile.
+- `not_eligible` falls slightly over time (89,454 to 89,401) because older
+  CVEs listed in KEV before T are `already_exploited` first.
+
+**How to check.** `uv run python -m vesper.components.b_survival.score_history`
+prints the table above and writes a new run folder.
+
 ## How to check
 
 Run from the repository root. Each command prints the report that the numbers
