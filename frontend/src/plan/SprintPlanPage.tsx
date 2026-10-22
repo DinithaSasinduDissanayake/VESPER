@@ -11,8 +11,13 @@ import {
   type PlannerRanking,
   type PlannerResponse,
 } from '@/api/queue'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import {
   Table,
   TableBody,
@@ -176,8 +181,8 @@ export function SprintPlanPage() {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Fusion · Risk ranking and patch planning</p>
+        <div className="flex flex-col gap-1">
+          <p className="text-muted-foreground">Fusion · Risk ranking and patch planning</p>
           <h2 className="text-2xl font-semibold tracking-tight">Sprint planner</h2>
           <p className="max-w-3xl text-sm text-muted-foreground">
             Review the provisional five-signal ranking, then schedule patches within the team’s daily capacity.
@@ -185,33 +190,35 @@ export function SprintPlanPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={reloadRanking} disabled={rankingLoading || planning}>
-            <RefreshCw aria-hidden="true" /> Reload ranking
+            <RefreshCw aria-hidden="true" data-icon="inline-start" /> Reload ranking
           </Button>
           {view === 'ranking' ? (
             <Button variant="outline" onClick={exportRanking} disabled={!ranking || downloadingRanking}>
-              <ArrowDownToLine aria-hidden="true" />
+              <ArrowDownToLine aria-hidden="true" data-icon="inline-start" />
               {downloadingRanking ? 'Preparing CSV…' : 'Download ranking CSV'}
             </Button>
           ) : (
             <Button variant="outline" onClick={() => plan && downloadPlanCsv(plan)} disabled={!plan}>
-              <ArrowDownToLine aria-hidden="true" /> Download {plan?.planning_period ?? ''} plan CSV
+              <ArrowDownToLine aria-hidden="true" data-icon="inline-start" /> Download {plan?.planning_period ?? ''} plan CSV
             </Button>
           )}
         </div>
       </header>
 
       {ranking && (ranking.synthetic || ranking.model_selection_status?.includes('provisional')) && (
-        <div className="flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm" role="status">
-          <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <p>
-            <strong>Provisional composite ranking.</strong> This is a normalized equal-weight score, not a trained or validated model prediction. Component snapshots are mixed-date; patch effort is estimated from CVSS severity.
-          </p>
-        </div>
+        <Alert role="status">
+          <ShieldAlert aria-hidden="true" />
+          <AlertTitle>Provisional composite ranking.</AlertTitle>
+          <AlertDescription>
+            This is a normalized equal-weight score, not a trained or validated model prediction. Component snapshots are mixed-date; patch effort is estimated from CVSS severity.
+          </AlertDescription>
+        </Alert>
       )}
       {error && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive" role="alert">
-          <strong>Planner request failed.</strong> {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertTitle>Planner request failed.</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(17rem,0.7fr)_minmax(0,1.8fr)]">
@@ -221,7 +228,7 @@ export function SprintPlanPage() {
               <CardTitle>Ranking input</CardTitle>
               <CardDescription>Loaded by FastAPI from the current Component D output.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="flex flex-col gap-2">
               {rankingLoading ? <p role="status" className="text-sm text-muted-foreground">Loading ranking…</p> : ranking ? (
                 <>
                   <p className="break-all font-medium">{ranking.ranking_file}</p>
@@ -242,20 +249,22 @@ export function SprintPlanPage() {
               <CardTitle>Team capacity and dates</CardTitle>
               <CardDescription>Capacity applies per workday. Weekly and monthly plans use 5 and 22 Monday–Friday workdays.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <label className="flex flex-col gap-1.5 text-sm">
-                Patchers
-                <input className="h-9 rounded-md border border-input bg-background px-3" type="number" min={1} max={100} step={1} value={patchers} onChange={(event) => setPatchers(Math.min(100, Math.max(1, Number(event.target.value) || 1)))} />
-              </label>
-              <label className="flex flex-col gap-1.5 text-sm">
-                Hours per person per day
-                <input className="h-9 rounded-md border border-input bg-background px-3" type="number" min={0.25} max={24} step={0.25} value={hoursPerPatcher} onChange={(event) => setHoursPerPatcher(Math.min(24, Math.max(0.25, Number(event.target.value) || 0.25)))} />
-              </label>
-              <label className="flex flex-col gap-1.5 text-sm">
-                Plan start date
-                <input className="h-9 rounded-md border border-input bg-background px-3" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-              </label>
-              <div className="rounded-md bg-muted p-3 text-sm">
+            <CardContent className="flex flex-col gap-4">
+              <FieldGroup className="gap-4">
+                <Field>
+                  <FieldLabel htmlFor="planner-patchers">Patchers</FieldLabel>
+                  <Input id="planner-patchers" type="number" min={1} max={100} step={1} value={patchers} onChange={(event) => setPatchers(Math.min(100, Math.max(1, Number(event.target.value) || 1)))} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="planner-hours">Hours per person per day</FieldLabel>
+                  <Input id="planner-hours" type="number" min={0.25} max={24} step={0.25} value={hoursPerPatcher} onChange={(event) => setHoursPerPatcher(Math.min(24, Math.max(0.25, Number(event.target.value) || 0.25)))} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="planner-start">Plan start date</FieldLabel>
+                  <Input id="planner-start" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+                </Field>
+              </FieldGroup>
+              <div className="rounded-lg bg-muted p-3">
                 Daily capacity <strong>{(patchers * hoursPerPatcher).toLocaleString()} person-hours</strong>
               </div>
               <p className="text-xs text-muted-foreground">Current plan value is risk score × business criticality (defaults to 1). CVSS severity tier provides a labeled effort estimate; it is not measured patch time.</p>
@@ -270,7 +279,7 @@ export function SprintPlanPage() {
 
         <Card className="min-w-0">
           <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <CardTitle>{view === 'ranking' ? 'Risk ranking' : `${plan?.planning_period ?? ''} patch plan`}</CardTitle>
               <CardDescription>
                 {view === 'ranking'
@@ -285,26 +294,26 @@ export function SprintPlanPage() {
               <Button size="sm" variant={view === 'plan' ? 'secondary' : 'outline'} onClick={() => setView('plan')} disabled={!plan}>Patch plan</Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="flex flex-col gap-3">
             {view === 'plan' && plan && (
               <div className="grid gap-3 sm:grid-cols-3">
-                <Card><CardContent className="pt-4"><p className="text-xs uppercase text-muted-foreground">Scheduled</p><p className="mt-1 text-xl font-semibold">{plan.scheduled.length} <span className="text-sm font-normal text-muted-foreground">CVEs</span></p></CardContent></Card>
-                <Card><CardContent className="pt-4"><p className="text-xs uppercase text-muted-foreground">Effort used</p><p className="mt-1 text-xl font-semibold">{plan.used_hours.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">/ {plan.capacity_hours.toFixed(1)} h</span></p></CardContent></Card>
-                <Card><CardContent className="pt-4"><p className="text-xs uppercase text-muted-foreground">Missing estimates</p><p className="mt-1 text-xl font-semibold">{missingEffort} <span className="text-sm font-normal text-muted-foreground">CVEs</span></p></CardContent></Card>
+                <Card size="sm"><CardHeader><CardDescription>Scheduled</CardDescription><CardTitle className="text-xl font-semibold tabular-nums">{plan.scheduled.length} <span className="text-sm font-normal text-muted-foreground">CVEs</span></CardTitle></CardHeader></Card>
+                <Card size="sm"><CardHeader><CardDescription>Effort used</CardDescription><CardTitle className="text-xl font-semibold tabular-nums">{plan.used_hours.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">/ {plan.capacity_hours.toFixed(1)} h</span></CardTitle></CardHeader></Card>
+                <Card size="sm"><CardHeader><CardDescription>Missing estimates</CardDescription><CardTitle className="text-xl font-semibold tabular-nums">{missingEffort} <span className="text-sm font-normal text-muted-foreground">CVEs</span></CardTitle></CardHeader></Card>
               </div>
             )}
             {view === 'plan' && plan && plan.daily_summaries.length > 1 && (
-              <div className="flex flex-wrap gap-2 text-xs">
+              <div className="flex flex-wrap gap-2">
                 {plan.daily_summaries.map((day) => (
-                  <span key={day.date} className="rounded-md border px-2 py-1">{day.date}: {day.selected_count} CVEs, {day.used_hours.toFixed(1)}/{day.capacity_hours.toFixed(1)} h</span>
+                  <Badge key={day.date} variant="outline">{day.date}: {day.selected_count} CVEs, {day.used_hours.toFixed(1)}/{day.capacity_hours.toFixed(1)} h</Badge>
                 ))}
               </div>
             )}
             {(view === 'ranking' || view === 'plan') && (view === 'ranking' ? ranking : plan) && (
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <label className="text-sm text-muted-foreground">
+                <label className="flex items-center gap-2 text-muted-foreground">
                   Search CVE ID
-                  <input className="ml-2 h-8 rounded-md border border-input bg-background px-2 text-foreground" type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0) }} placeholder="CVE-YYYY-NNNN" />
+                  <Input className="w-48" type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0) }} placeholder="CVE-YYYY-NNNN" />
                 </label>
                 {view === 'plan' && <span className="text-xs text-muted-foreground">Daily knapsack is rerun on remaining CVEs for each workday.</span>}
               </div>
@@ -344,7 +353,7 @@ export function SprintPlanPage() {
                         <TableRow key={item.cve_id}>
                           {view === 'plan' && <TableCell>{planned.selected ? `Scheduled · ${planned.planned_date ?? ''}` : 'Deferred'}</TableCell>}
                           <TableCell>{item.model_rank}</TableCell><TableCell className="font-mono">{item.cve_id}</TableCell>
-                          <TableCell className="text-right font-semibold">{displayValue(item.risk_score)}</TableCell>
+                          <TableCell className="text-right font-medium tabular-nums">{displayValue(item.risk_score)}</TableCell>
                           <TableCell className="text-right" title={scoreTitle(item.status_a, item.reason_a)}>{displayValue(item.score_a)}</TableCell>
                           <TableCell className="text-right" title={scoreTitle(item.status_b, item.reason_b)}>{displayValue(item.score_b)}</TableCell>
                           <TableCell className="text-right" title={scoreTitle(item.status_c, item.reason_c)}>{displayValue(item.score_c)}</TableCell>
@@ -352,8 +361,9 @@ export function SprintPlanPage() {
                           <TableCell className="text-right">{displayValue(item.epss_score)}</TableCell>
                           <TableCell>
                             {view === 'ranking' ? (
-                              <select
-                                className="h-8 rounded-md border border-input bg-background px-2"
+                              <NativeSelect
+                                size="sm"
+                                className="w-28"
                                 aria-label={`Business criticality for ${item.cve_id}`}
                                 value={criticality}
                                 onChange={(event) => setOverrides((current) => ({
@@ -361,14 +371,16 @@ export function SprintPlanPage() {
                                   [item.cve_id]: { ...current[item.cve_id], business_criticality: Number(event.target.value) },
                                 }))}
                               >
-                                <option value={1}>1 · Low</option><option value={2}>2 · Medium</option><option value={3}>3 · High</option>
-                              </select>
+                                <NativeSelectOption value={1}>1 · Low</NativeSelectOption>
+                                <NativeSelectOption value={2}>2 · Medium</NativeSelectOption>
+                                <NativeSelectOption value={3}>3 · High</NativeSelectOption>
+                              </NativeSelect>
                             ) : criticality}
                           </TableCell>
                           <TableCell title={item.patch_hours_method ?? undefined}>
                             {view === 'ranking' ? (
-                              <input
-                                className="h-8 w-24 rounded-md border border-input bg-background px-2"
+                              <Input
+                                className="h-7 w-24"
                                 type="number"
                                 min={0.25}
                                 max={1000}
