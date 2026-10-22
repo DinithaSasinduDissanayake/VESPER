@@ -1,46 +1,4 @@
-"""
-Historical Component B score snapshots, for training and evaluating Component D.
-
-For every decision time T of the grid, B is replayed as it could have run on T:
-
-  1. The Cox model is fitted only on post_kev CVEs published before T,
-     re-censored at T, with exploit dates on or after T removed
-     (score_export.fit_scoring_model -> split_data.split_at_cutoff).
-     trained_through = T.
-  2. Every study CVE published before T is scored at T with the same rules as
-     the current export (score_export.build_timing_scores): the conditional
-     30-day estimate 1 - S(age + 30 | x) / S(age | x), age measured at T, and
-     the same statuses and reasons. A CVE listed in KEV before T is
-     already_exploited; one listed on or after T is scored normally.
-  3. The raw estimate is turned into a percentile rank among the CVEs available
-     AT THAT T (rank / N, ties share the average rank).
-
-B does not label. Component D adds kev_within_horizon itself.
-
-Every label window (T + HORIZON_DAYS) must end before the data snapshot, so the
-last T is at most SNAPSHOT_DATE - HORIZON_DAYS. The default grid starts at
-2024-07-01: before that the post_kev train sets have too few events (216 at
-2024-01-01, 79 at 2023-01-01; split_summary.csv).
-
-Limits (also written in the metadata; see docs/COMPONENT_B_DATA_DECISIONS.md
-section 17): this is a RETROSPECTIVE REPLAY, not a point-in-time record. NVD
-fields (CVSS, CWE) come from the current NVD snapshot, so CVSS scores added or
-changed after T leak in. KEV and Exploit-DB dates are used as dated; deleted or
-backdated entries cannot be detected.
-
-Output (one new folder per run; an existing run is never overwritten):
-    outputs/b_survival/history/run-NNN/
-        b_exploit_timing_history_<T>.csv               percentile, for D
-        b_exploit_timing_probability_history_<T>.csv   raw estimate
-        history.metadata.json                          grid, per-T counts, hashes, limits
-
-Each file holds one decision time, one row per CVE, sorted by cve_id, with the
-11 Score columns, so each one passes D's per-CVE file check unchanged.
-
-Run from anywhere (run survival_table first):
-    uv run python -m vesper.components.b_survival.score_history
-    uv run python -m vesper.components.b_survival.score_history --decision-times 2025-01-01
-"""
+"""Historical Component B score snapshots, for training and evaluating Component D."""
 
 import argparse
 import hashlib

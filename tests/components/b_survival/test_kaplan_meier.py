@@ -1,4 +1,4 @@
-"""Tests for kaplan_meier. They use small made-up tables, not the real files."""
+"""Tests for kaplan_meier."""
 
 import pandas as pd
 import pytest

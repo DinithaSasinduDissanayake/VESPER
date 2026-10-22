@@ -1,12 +1,4 @@
-"""
-Download the CISA KEV (Known Exploited Vulnerabilities) catalogue.
-
-KEV is the official list of CVEs confirmed as exploited in the wild.
-In Component B it provides the "event" date: the `dateAdded` field.
-
-Run from anywhere:
-    uv run python -m vesper.components.b_survival.download_kev
-"""
+"""Download the CISA KEV (Known Exploited Vulnerabilities) catalogue."""
 
 import json
 import sys

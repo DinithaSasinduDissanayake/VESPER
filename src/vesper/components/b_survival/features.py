@@ -1,32 +1,4 @@
-"""
-Day-0 features for the Component B models.
-
-Only what is known on the publication day is used:
-    cvss_base_score            (standardised with the TRAIN mean and spread)
-    cvss_attack_vector         one dummy per level, except the most common one
-    cvss_attack_complexity     "
-    cvss_privileges_required   "
-    cvss_user_interaction      "
-    exploit_at_publication     0 / 1
-    cwe_<id>                   one dummy for each of the TOP_CWE_COUNT CWE IDs found
-                               in the most TRAIN CVEs; every other CWE (and no CWE)
-                               is "other", the reference
-
-Every choice (mean, spread, levels, reference levels, top CWEs) is learned on the
-TRAIN set only (FeatureEncoder.fit) and then applied unchanged to any other rows
-(FeatureEncoder.transform), so nothing about the test set leaks into the model.
-
-Never used (BANNED_COLUMNS):
-  - in_kev, kev_date_added: the outcome
-  - exploit_first_date: the exploit can appear after day 0 (look-ahead leakage)
-  - kev_launch_group, already_exploited: made from the KEV date (the outcome)
-  - cvss_missing: in section 13 the 10,043 CVEs without a CVSS 3.x score had 0
-    events. NVD often scores a CVE soon after it is listed in KEV, so "missing
-    CVSS" partly reflects the outcome.
-
-CVEs without a CVSS score are therefore left out of the models
-(drop_missing_cvss) and counted, instead of being given a "missing" level.
-"""
+"""Day-0 features for the Component B models."""
 
 import warnings
 

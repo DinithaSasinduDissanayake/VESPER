@@ -1,18 +1,4 @@
-"""
-Download CVE records from the NVD (National Vulnerability Database) API 2.0.
-
-NVD gives, for every CVE, the disclosure date (`published`) and the CVSS
-score and vector. In Component B the published date is the start of the
-survival clock and the CVSS metrics are the main covariates.
-
-The download is split into one file per month of publication:
-    data/raw/nvd/nvd_2015-01.json.gz, nvd_2015-02.json.gz, ...
-If the script stops halfway, run it again: months already saved are skipped.
-
-Run from anywhere (everything from START_YEAR, or one month only for testing):
-    uv run python -m vesper.components.b_survival.download_nvd
-    uv run python -m vesper.components.b_survival.download_nvd 2015-01
-"""
+"""Download CVE records from the NVD (National Vulnerability Database) API 2.0."""
 
 import calendar
 import gzip

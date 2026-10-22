@@ -1,36 +1,4 @@
-"""
-Cox proportional-hazards model and its baselines for Component B.
-
-Models fitted on each TRAIN set (see features.py for the inputs):
-  cox          Cox model on all Day-0 features
-  cvss_cox     Cox model on the CVSS base score only (baseline b)
-  cvss_rank    no fitting: test CVEs ranked by cvss_base_score (baseline a, the
-               current practice). It gives a ranking, not a probability.
-  km_reference Kaplan-Meier of the train set, the same curve for every CVE. It is
-               the reference for the Brier score: a model must beat "no features".
-  cox_breslow  the cox model with lifelines' step baseline (comparison only, for
-               the Brier score; its ranking is the same as cox)
-
-Baseline hazard (docs/COMPONENT_B_DATA_DECISIONS.md section 19). The Cox
-coefficients come from lifelines. The baseline hazard is NOT lifelines' Breslow
-step curve, which only drops on days when a train CVE was listed: a 30-day
-window of age without such a day gives an estimate of exactly 0. Instead the
-baseline hazard is constant within age bands (BASELINE_BAND_EDGES), and bands
-are merged until each holds at least MIN_BAND_EVENTS train listings. With the
-coefficients fixed, the rate of a band is its maximum-likelihood estimate:
-    listings in the band / sum over train CVEs of exp(x·beta) x days at risk in the band
-
-The Cox models use a small ridge penalty (PENALIZER = 0.01). Some train sets have
-very few events (fewer than split_data.MIN_TRAIN_EVENTS at the earliest post_kev
-cut-offs; the counts are in split_summary.csv) and several dummies are rare, so a
-coefficient can run off to infinity when a dummy has no events. The penalty keeps
-every coefficient finite and stable while hardly changing the well-supported
-ones. Because of it, the confidence intervals are approximate.
-
-predict_risk() scores new CVE rows for Component D and the user interface.
-The scores are RANKING scores: the estimates of "listed by day t" have not been
-validated as probabilities yet (CONTRIBUTING.md).
-"""
+"""Cox proportional-hazards model and its baselines for Component B."""
 
 import warnings
 from dataclasses import dataclass

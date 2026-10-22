@@ -1,7 +1,4 @@
-"""Tests for score_history. Small made-up data, no real files.
-
-D's file check (d_fusion.fusion._read_component) is called here, in a test only.
-"""
+"""Tests for score_history."""
 
 import json
 from datetime import date

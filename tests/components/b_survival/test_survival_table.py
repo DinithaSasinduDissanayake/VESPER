@@ -1,4 +1,4 @@
-"""Tests for survival_table. They use small made-up tables, not the real files."""
+"""Tests for survival_table."""
 
 from datetime import date
 

@@ -1,4 +1,4 @@
-"""Tests for link_sources. They use small made-up tables, not the real files."""
+"""Tests for link_sources."""
 
 from datetime import date
 

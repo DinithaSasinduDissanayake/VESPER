@@ -1,4 +1,4 @@
-"""Tests for clean_kev. They use small made-up records, not the real KEV file."""
+"""Tests for clean_kev."""
 
 import json
 from datetime import date
