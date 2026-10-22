@@ -142,5 +142,7 @@
     }
   html {
     @apply font-sans;
+    /* 17px base: the nova scale reads small on a data-heavy screen. */
+    font-size: 106.25%;
     }
 }
