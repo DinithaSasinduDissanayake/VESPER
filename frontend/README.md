@@ -25,9 +25,39 @@ a `bun.lock` change you did not mean to make.
 | `src/plan/` | B.L. Beminiwatte | Sprint plan page (`SprintPlanPage.tsx`) and the Fusion section (`FusionSection.tsx`) |
 | `src/queue/`, `src/api/`, `src/scores/`, `App.tsx`, `pages.tsx` | Whole team | Shared: priority queue, CVE detail layout, data access, help page |
 
-Each "section" is one card on the CVE detail view. All four use the shared card in
-`queue/ScoreSection.tsx`. Make your section richer inside your own file; change the
-shared card only in a separate small PR.
+Each "section" is one card on the CVE detail view. Text, timing and fusion use
+`queue/ScoreSection.tsx`; Structural Relationships has a richer full-width card
+inside `exposure/`. Change the shared score card only in a separate small PR.
+
+## Structural Relationships UI
+
+The `exposure/` directory contains the structural summary, bounded SVG relationship
+graph, CVSS comparison and evidence/provenance panels. `types.ts` defines the
+detail and loading/error states. Presentation receives data through props;
+`sampleStructuralDetails.ts` owns all illustrative fixtures and adapts sample
+queue items. No API, research CSV loading or backend calculation is connected.
+
+The standalone Structural Relationships page includes a demo scenario selector
+for higher/equal/lower comparison, unavailable score with partial evidence,
+not-eligible, loading and error states. All displayed measurements and
+relationships are sample data, even when the selected CVE identifier is real.
+Primary PageRank percentile, raw PageRank and comparison-cohort percentile remain
+separate. Missing evidence is not a confirmed empty set.
+
+The graph previews four products and four weaknesses; full evidence is available
+through Show more/less controls. It uses a horizontal SVG layout on wide screens
+and a vertical layout at narrower widths, without a graph library.
+
+Focused regression checks use the existing Node, Vite and React dependencies:
+
+```bash
+node --test src/exposure/structuralDetails.test.mjs
+```
+
+For the next phase, map an agreed backend response to `StructuralDetailsState`
+at the data boundary and replace the sample adapters. Preserve score/evidence
+availability, population definitions and snapshot identity; do not recompute
+research percentiles in the browser.
 
 ## Data flow
 
@@ -72,7 +102,7 @@ Do not edit generated files or copy components in by hand.
 
 ## Rules
 
-- Never show "Component A/B/C/D" in the UI. Use plain names: Text signal, Exploit timing, Exposure, Fusion.
+- Never show "Component A/B/C/D" in the UI. Use plain names: Text signal, Exploit timing, Structural Relationships, Fusion.
 - No other UI libraries (only shadcn/ui, Tailwind and lucide icons).
 - Small pull requests, one topic each.
 - Sample data must always be labelled as sample data on screen.
