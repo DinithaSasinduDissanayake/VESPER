@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from vesper.api import c_graph
 from vesper.api.main import app
+from vesper.config import load_settings
 
 REFERENCE = "2026-10-15T00:00:00+00:00"
 IDENTITY = {
@@ -258,11 +259,15 @@ def test_missing_artifact_files_return_clean_503(client, artifacts, missing):
 
 
 def test_default_paths_missing_return_clean_503(client, monkeypatch, tmp_path):
-    for name in ("VESPER_C_FEATURE_PROVIDER_CSV", "VESPER_C_SCORES_CSV"):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.delenv("VESPER_C_DISAGREEMENT_CSV", raising=False)
+    # Empty vars keep .env from refilling them; the root points defaults at an empty dir.
+    for name in (
+        "VESPER_C_FEATURE_PROVIDER_CSV",
+        "VESPER_C_SCORES_CSV",
+        "VESPER_C_DISAGREEMENT_CSV",
+    ):
+        monkeypatch.setenv(name, "")
     monkeypatch.setattr(c_graph, "_index", None)
-    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(c_graph, "load_settings", lambda: load_settings(tmp_path))
     response = client.get("/api/c-graph/cves/CVE-2024-0001")
     assert response.status_code == 503
     assert "unavailable" in response.json()["detail"]
