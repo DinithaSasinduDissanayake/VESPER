@@ -9,7 +9,7 @@ export function StructuralSummary({ data }: { data: StructuralDetails }) {
   const metrics = [
     { label: 'PageRank percentile', value: available ? percent(score.value!) : 'Unavailable', icon: Activity, note: 'Relative structural importance' },
     { label: 'Observed relationships', value: data.graphFeatures.degree?.toLocaleString() ?? 'Unavailable', icon: GitFork, note: 'Degree · products + weaknesses' },
-    { label: 'Raw PageRank', value: data.graphFeatures.pagerankRaw?.toExponential(3) ?? 'Unavailable', icon: Hash, note: 'Unscaled graph centrality' },
+    { label: 'Raw PageRank', value: data.graphFeatures.pagerankRaw?.toExponential(3) ?? 'Unavailable', icon: Hash, note: 'Broader structural prominence' },
     { label: 'Status', value: available ? 'Available' : 'Unavailable', icon: CircleCheck, note: score.status.replaceAll('_', ' ') },
   ]
   return (
@@ -24,7 +24,7 @@ export function StructuralSummary({ data }: { data: StructuralDetails }) {
         ))}
       </dl>
       {score.reason && <p className="mt-3 rounded-lg border border-dashed p-3 text-sm">{score.reason}</p>}
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Structural score represents relative importance within the observed vulnerability–product–weakness graph, not exploitation probability.</p>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Structural score represents relative importance within the observed vulnerability–product–weakness graph, not exploitation probability. Degree measures direct/local connectivity; PageRank measures broader/global structural prominence.</p>
     </div>
   )
 }

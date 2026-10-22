@@ -45,7 +45,7 @@ function RankingRows({ candidates, onSelect }: { candidates: PlannerCandidate[];
           <TableHead className="text-right">Risk score</TableHead>
           <TableHead className="text-right">Text (A)</TableHead>
           <TableHead className="text-right">Timing (B)</TableHead>
-          <TableHead className="text-right">Exposure (C)</TableHead>
+          <TableHead className="text-right">Structural signal (C)</TableHead>
           <TableHead className="text-right">CVSS</TableHead>
           <TableHead className="text-right">EPSS</TableHead>
           <TableHead className="text-right">Signals</TableHead>
