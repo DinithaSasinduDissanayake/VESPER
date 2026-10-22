@@ -1,10 +1,9 @@
-"""Generate a larger, reproducible set of synthetic A/B/C score inputs."""
+"""Generate the reproducible synthetic A/B score inputs for Component D."""
 
 import argparse
 import hashlib
 import math
 import re
-from collections import Counter
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 
@@ -19,7 +18,6 @@ EPSS_BANDS = ("low", "guarded", "elevated", "high")
 COMPONENTS = (
     ("a_text", "synthetic-a-text-heuristic-0.2"),
     ("b_survival", "synthetic-b-poc-simulation-0.2"),
-    ("c_graph", "synthetic-c-degree-proxy-0.2"),
 )
 
 TEXT_PATTERNS = {
@@ -51,25 +49,6 @@ TEXT_PATTERNS = {
     "cross_site_scripting": (re.compile(r"\b(cross.site scripting|\bxss\b)"), 0.04),
 }
 DOS_PATTERN = re.compile(r"\b(denial.of.service|\bdos\b|service disruption)\b")
-
-
-def _as_values(value: object) -> list:
-    if value is None:
-        return []
-    if hasattr(value, "tolist"):
-        value = value.tolist()
-    if isinstance(value, (list, tuple)):
-        return list(value)
-    return []
-
-
-def _pairs(value: object) -> list[tuple[str, str]]:
-    pairs = []
-    for pair in _as_values(value):
-        parts = _as_values(pair)
-        if len(parts) >= 2 and parts[0] and parts[1]:
-            pairs.append((str(parts[0]).strip().lower(), str(parts[1]).strip().lower()))
-    return pairs
 
 
 def _cvss_band(score: float) -> str:
@@ -182,45 +161,6 @@ def _poc_scenario(cve_id: str, description: str) -> tuple[float | None, str | No
     return round(urgency, 6), None
 
 
-def _graph_scores(nvd: pd.DataFrame) -> dict[str, float]:
-    """Use NVD vendor/product/CWE node degree as a graph centrality proxy."""
-    records = []
-    vendor_degree: Counter[str] = Counter()
-    product_degree: Counter[tuple[str, str]] = Counter()
-    cwe_degree: Counter[str] = Counter()
-
-    for row in nvd.itertuples(index=False):
-        vendors_and_products = set(_pairs(row.affected))
-        vendors = {vendor for vendor, _ in vendors_and_products}
-        cwes = {str(cwe).strip().upper() for cwe in _as_values(row.cwe_ids) if cwe}
-        records.append((str(row.cve_id), vendors, vendors_and_products, cwes))
-        vendor_degree.update(vendors)
-        product_degree.update(vendors_and_products)
-        cwe_degree.update(cwes)
-
-    centrality = []
-    cve_order = []
-    for cve_id, vendors, products, cwes in records:
-        node_degrees = (
-            [vendor_degree[node] for node in vendors]
-            + [product_degree[node] for node in products]
-            + [cwe_degree[node] for node in cwes]
-        )
-        value = (
-            sum(math.log1p(degree) for degree in node_degrees) / len(node_degrees)
-            if node_degrees
-            else 0.0
-        )
-        cve_order.append(cve_id)
-        centrality.append(value)
-
-    percentiles = pd.Series(centrality).rank(method="average", pct=True).to_numpy()
-    return {
-        cve_id: round(float(score), 6)
-        for cve_id, score in zip(cve_order, percentiles, strict=True)
-    }
-
-
 def _score_row(
     cve_id: str,
     component: str,
@@ -266,7 +206,7 @@ def generate(settings, dummy_dir: Path, rows: int = TARGET_ROWS) -> None:
         snapshot_date, time(23, 59, 59), tzinfo=UTC
     ).isoformat()
 
-    feature_columns = ["cve_id", "description", "cwe_ids", "affected"]
+    feature_columns = ["cve_id", "description"]
     candidates = baseline.merge(
         nvd[feature_columns], on="cve_id", how="inner", validate="one_to_one"
     )
@@ -283,7 +223,6 @@ def generate(settings, dummy_dir: Path, rows: int = TARGET_ROWS) -> None:
     if len(sample) != rows:
         raise ValueError(f"Expected {rows} selected CVEs, found {len(sample)}")
 
-    graph_scores = _graph_scores(nvd)
     outputs = {component: [] for component, _ in COMPONENTS}
     for row in sample.itertuples(index=False):
         cve_id = str(row.cve_id)
@@ -307,32 +246,22 @@ def generate(settings, dummy_dir: Path, rows: int = TARGET_ROWS) -> None:
                 reason,
             )
         )
-        outputs["c_graph"].append(
-            _score_row(
-                cve_id,
-                "c_graph",
-                graph_scores[cve_id],
-                snapshot_date,
-                decision_time,
-            )
-        )
-
     dummy_dir.mkdir(parents=True, exist_ok=True)
     filenames = {
         "a_text": "a_text_scores.csv",
         "b_survival": "b_exploit_timing_scores.csv",
-        "c_graph": "c_graph_scores.csv",
     }
     for component, component_rows in outputs.items():
         pd.DataFrame(component_rows).to_csv(dummy_dir / filenames[component], index=False)
-    print(f"Generated {rows} synthetic CVE score rows for each of A, B, and C")
+    print(f"Generated {rows} synthetic CVE score rows for A and B")
+    print("Component C is supplied by the real c_graph_scores.csv handoff")
     print(f"Shared snapshot: {snapshot_date}; decision time: {decision_time}")
     print(f"B abstentions: {sum(row['status'] == 'abstained' for row in outputs['b_survival'])}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Regenerate stratified synthetic A/B/C score inputs for Component D"
+        description="Regenerate stratified synthetic A/B score inputs for Component D"
     )
     parser.add_argument("--rows", type=int, default=TARGET_ROWS)
     args = parser.parse_args()

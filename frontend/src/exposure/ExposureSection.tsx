@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { StructuralRelationshipGraph } from './StructuralRelationshipGraph'
 import { StructuralSummary } from './StructuralSummary'
 import { StructuralCvssComparison } from './StructuralCvssComparison'
+import { findScore } from '@/queue/format'
+import { ScoreSection } from '@/queue/ScoreSection'
+import type { QueueItem } from '@/queue/types'
 import type { StructuralDetails, StructuralDetailsState } from './types'
 
 function RelationshipEvidence({ data }: { data: StructuralDetails }) {
@@ -36,8 +39,13 @@ function RelationshipEvidence({ data }: { data: StructuralDetails }) {
   )
 }
 
-export function ExposureSection({ resource }: { resource: StructuralDetailsState }) {
+export function ExposureSection({ resource, item }: { resource?: StructuralDetailsState; item?: QueueItem }) {
   const id = useId()
+  if (!resource && item) {
+    return <ScoreSection title="Exposure" score={findScore(item, 'c_graph')} />
+  }
+  if (!resource) return null
+
   return (
     <Card className="min-w-0 gap-5" aria-labelledby={`${id}-title`}>
       <CardHeader className="gap-3">

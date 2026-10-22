@@ -1,13 +1,14 @@
 import {
   CalendarDays,
   CirclePlus,
+  House,
   ListChecks,
   Radar,
   Timer,
   type LucideIcon,
 } from 'lucide-react'
 
-export type PageId = 'queue' | 'timing' | 'exposure' | 'sprint' | 'analyse' | 'scores'
+export type PageId = 'home' | 'queue' | 'timing' | 'exposure' | 'sprint' | 'analyse' | 'scores'
 
 type Page = {
   title: string
@@ -16,6 +17,10 @@ type Page = {
 
 // One entry per page. TypeScript checks that every PageId has an entry.
 export const pages: Record<PageId, Page> = {
+  home: {
+    title: 'Home',
+    icon: House,
+  },
   queue: {
     title: 'Priority queue',
     icon: ListChecks,
@@ -42,4 +47,4 @@ export const pages: Record<PageId, Page> = {
 }
 
 // Order of the items in the main sidebar menu.
-export const mainNav: PageId[] = ['queue', 'timing', 'exposure', 'sprint', 'analyse']
+export const mainNav: PageId[] = ['home', 'queue', 'timing', 'exposure', 'sprint', 'analyse']
