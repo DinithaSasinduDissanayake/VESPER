@@ -97,7 +97,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
           <h2 className="max-w-2xl text-3xl font-semibold tracking-tight text-balance md:text-4xl">
             Turn vulnerability signals into a patch plan.
           </h2>
-          <p className="max-w-2xl text-base text-pretty text-muted-foreground">
+          <p className="max-w-2xl text-lg text-pretty text-muted-foreground">
             Review the current risk ranking, then allocate team capacity to build a practical daily, weekly, or monthly patch schedule.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -126,7 +126,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
               <span className="text-sm font-normal text-muted-foreground">ranked CVEs</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3 text-xs text-muted-foreground">
+          <CardContent className="flex flex-col gap-3 text-muted-foreground">
             <p>
               {ranking
                 ? `Composite ranking${ranking.vulnerabilities[0]?.data_as_of ? ` · data as of ${ranking.vulnerabilities[0].data_as_of}` : ''}`
@@ -136,7 +136,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
             </p>
             <Separator />
             <p className="flex items-start gap-2">
-              <CircleAlert className="mt-px size-3.5 shrink-0" />
+              <CircleAlert className="mt-0.5 size-4 shrink-0" />
               This is an equal-weight provisional composite, not a trained or validated predictive model.
             </p>
           </CardContent>
@@ -156,7 +156,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
               </CardAction>
             </CardHeader>
             <CardContent className="flex-1">
-              <p className="text-muted-foreground">{detail}</p>
+              <p className="text-base text-muted-foreground">{detail}</p>
             </CardContent>
             <CardFooter>
               <Button variant="outline" size="sm" onClick={() => onNavigate(page)}>
@@ -174,7 +174,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
             <CardDescription>Five evidence streams inform the current provisional ranking.</CardDescription>
           </CardHeader>
           <CardContent>
-            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+            <dl className="grid gap-x-6 gap-y-4 text-base sm:grid-cols-2">
               {signalDescriptions.map((signal) => (
                 <div key={signal.key} className="flex items-start gap-3">
                   <Badge variant="secondary" className="mt-px w-12">{signal.key}</Badge>
@@ -195,14 +195,14 @@ export function HomePage({ onNavigate }: HomePageProps) {
           </CardHeader>
           <CardContent className="flex-1">
             {topItems.length ? (
-              <ul className="flex flex-col">
+              <ul className="flex flex-col text-base">
                 {topItems.map((item, index) => (
                   <li key={item.cve_id} className="flex flex-col">
                     {index > 0 && <Separator />}
                     <div className="flex items-center justify-between gap-4 py-3">
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <span className="truncate font-mono font-medium">{item.cve_id}</span>
-                        <span className="text-xs text-muted-foreground">Risk rank {item.model_rank}</span>
+                        <span className="text-sm text-muted-foreground">Risk rank {item.model_rank}</span>
                       </div>
                       <span className="font-medium tabular-nums">{item.risk_score.toFixed(3)}</span>
                     </div>
@@ -210,7 +210,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
                 ))}
               </ul>
             ) : (
-              <p className="py-3 text-muted-foreground">
+              <p className="py-3 text-base text-muted-foreground">
                 {error ? 'Ranking feed unavailable.' : 'Loading current priorities…'}
               </p>
             )}
