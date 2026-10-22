@@ -35,11 +35,11 @@ function NavItem({ id, activeId, onSelect, className }: NavItemProps) {
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size="lg"
       aria-current={isActive ? 'page' : undefined}
       onClick={() => onSelect(id)}
       className={cn(
-        'justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+        'h-10 justify-start gap-3 px-3 text-base text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&_svg:not([class*=size-])]:size-5',
         isActive && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground',
         className,
       )}
@@ -59,28 +59,28 @@ function App() {
 
   return (
     <div className="flex min-h-svh flex-col bg-background md:flex-row">
-      <aside className="flex w-full shrink-0 flex-col border-b bg-sidebar text-sidebar-foreground md:sticky md:top-0 md:h-svh md:w-60 md:border-r md:border-b-0">
+      <aside className="flex w-full shrink-0 flex-col border-b bg-sidebar text-sidebar-foreground md:sticky md:top-0 md:h-svh md:w-64 md:border-r md:border-b-0">
         <button
           type="button"
           onClick={() => goTo('home')}
-          className="flex items-center gap-2.5 px-4 py-4 text-left outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
+          className="flex items-center gap-3 px-4 py-5 text-left outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
         >
-          <span className="grid size-8 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <ShieldCheck className="size-4" />
+          <span className="grid size-9 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+            <ShieldCheck className="size-5" />
           </span>
           <span className="flex flex-col">
-            <span className="text-sm font-semibold">VESPER</span>
-            <span className="text-xs text-muted-foreground">Vulnerability evidence workbench</span>
+            <span className="text-base font-semibold">VESPER</span>
+            <span className="text-sm text-muted-foreground">Vulnerability evidence workbench</span>
           </span>
         </button>
 
-        <nav aria-label="Main" className="flex flex-1 flex-wrap gap-1 p-2 md:flex-col md:flex-nowrap">
+        <nav aria-label="Main" className="flex flex-1 flex-wrap gap-1 p-3 md:flex-col md:flex-nowrap">
           {mainNav.map((id) => (
             <NavItem key={id} id={id} activeId={activeId} onSelect={goTo} />
           ))}
         </nav>
 
-        <nav aria-label="Help" className="flex flex-col border-t p-2">
+        <nav aria-label="Help" className="flex flex-col border-t p-3">
           <NavItem
             id="scores"
             activeId={activeId}
@@ -92,11 +92,11 @@ function App() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex h-14 items-center border-b bg-background/95 px-4 backdrop-blur sm:px-6">
-          <h1 className="text-sm font-medium">{page.title}</h1>
+          <h1 className="text-base font-medium">{page.title}</h1>
         </header>
 
         {/* key resets the page's state (e.g. the open CVE) when the page changes. */}
-        <main className="min-w-0 flex-1 p-4 text-sm sm:p-6">
+        <main className="min-w-0 flex-1 p-4 text-base sm:p-6 lg:p-8">
           {activeId === 'home' ? (
             <HomePage key={activeId} onNavigate={goTo} />
           ) : (
