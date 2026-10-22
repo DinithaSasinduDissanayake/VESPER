@@ -1,9 +1,10 @@
 """Tests for the study dates of Component B."""
 
-from datetime import date
+from datetime import date, timedelta
 
 from vesper.components.b_survival.study_design import (
     CUTOFF_DATES,
+    MAIN_CUTOFF,
     MATURITY_DAYS,
     SNAPSHOT_DATE,
     STUDY_START,
@@ -28,7 +29,14 @@ def test_proposed_cutoff_dates():
         date(2022, 7, 1),
         date(2023, 1, 1),
         date(2024, 1, 1),
+        date(2024, 7, 1),
     )
+
+
+def test_the_main_cutoff_is_a_cutoff_with_a_full_test_window_before_the_snapshot():
+    assert MAIN_CUTOFF in CUTOFF_DATES
+    assert MAIN_CUTOFF == max(CUTOFF_DATES)
+    assert MAIN_CUTOFF + timedelta(days=MATURITY_DAYS) < SNAPSHOT_DATE
 
 
 def test_cutoff_dates_are_in_order_and_inside_the_study():

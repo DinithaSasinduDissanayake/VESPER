@@ -4,10 +4,11 @@ import {
   House,
   ListChecks,
   Radar,
+  Timer,
   type LucideIcon,
 } from 'lucide-react'
 
-export type PageId = 'home' | 'queue' | 'exposure' | 'sprint' | 'analyse' | 'scores'
+export type PageId = 'home' | 'queue' | 'timing' | 'exposure' | 'sprint' | 'analyse' | 'scores'
 
 type Page = {
   title: string
@@ -24,8 +25,12 @@ export const pages: Record<PageId, Page> = {
     title: 'Priority queue',
     icon: ListChecks,
   },
+  timing: {
+    title: 'Exploit timing',
+    icon: Timer,
+  },
   exposure: {
-    title: 'Exposure',
+    title: 'Structural Relationships',
     icon: Radar,
   },
   sprint: {
@@ -42,4 +47,4 @@ export const pages: Record<PageId, Page> = {
 }
 
 // Order of the items in the main sidebar menu.
-export const mainNav: PageId[] = ['home', 'queue', 'exposure', 'sprint', 'analyse']
+export const mainNav: PageId[] = ['home', 'queue', 'timing', 'exposure', 'sprint', 'analyse']

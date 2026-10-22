@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ExposureSection } from '@/exposure/ExposureSection'
 import { sampleStructuralDetails, sampleStructuralState } from '@/exposure/sampleStructuralDetails'
 import type { StructuralDetails, StructuralDetailsState } from '@/exposure/types'
+import { TimingSection } from '@/timing/TimingSection'
+import type { QueueItem } from './types'
 
 type CveDetailProps = {
   candidate: PlannerCandidate
@@ -25,6 +27,20 @@ function structuralStateForCandidate(candidate: PlannerCandidate): StructuralDet
     }
   }
   return { state: 'loaded', data }
+}
+
+// TimingSection reads a queue row; build one from the planner row and NVD facts.
+function timingItem(facts: VulnerabilityFacts, candidate: PlannerCandidate): QueueItem {
+  return {
+    vulnerability: {
+      cve_id: candidate.cve_id,
+      description: facts.description,
+      cvss_base_score: facts.cvss_base_score,
+      affected: facts.affected,
+    },
+    epss: candidate.epss_score,
+    scores: [],
+  }
 }
 
 function displayScore(value: number | null, digits = 3) {
@@ -146,6 +162,10 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
 
         <div className="min-w-0 lg:col-span-2">
           <ExposureSection resource={structuralStateForCandidate(candidate)} />
+        </div>
+
+        <div className="min-w-0 lg:col-span-2">
+          <TimingSection item={timingItem(facts, candidate)} />
         </div>
       </div>
 
