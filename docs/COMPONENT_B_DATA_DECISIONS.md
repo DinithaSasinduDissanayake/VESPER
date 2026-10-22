@@ -475,9 +475,11 @@ is 1.000. The censoring curve is therefore taken from the test set being
 evaluated, as in Graf et al. (1999). This uses only follow-up lengths, not
 model inputs.
 
-**Results.**
+**Results.** These were the results before the 2024-07-01 cut-off was added.
+The main result is now post_kev 2024-07-01 (section 18); every number below
+was reproduced exactly by the rerun.
 
-- *Ranking (main cohort, latest cut-off).* post_kev 2024-01-01: c-index 0.775
+- *Ranking (main cohort, then latest cut-off).* post_kev 2024-01-01: c-index 0.775
   (0.741–0.808) for `cox` against 0.763 (0.731–0.793) for `cvss_rank`. The
   intervals overlap, so the Cox model has not been shown to rank better than
   CVSS.
@@ -676,6 +678,58 @@ time). The 2.3 GB of output is in `outputs/`, which git ignores.
 
 **How to check.** `uv run python -m vesper.components.b_survival.score_history`
 prints the table above and writes a new run folder.
+
+## 18. The 2024-07-01 cut-off: the main result
+
+**Decision.** `date(2024, 7, 1)` is added to `CUTOFF_DATES` and is the main
+result (`MAIN_CUTOFF` in `study_design.py`). The four earlier cut-offs are
+kept, not deleted: deleting them would look like choosing dates until the
+results look good. Its test window ends on 2025-06-30, so 2024-07-01 + 365 days
+(2025-07-01) is before the snapshot (2026-10-01) and every test CVE has the
+full maturity follow-up.
+
+**Reason.** The earlier post_kev train sets have 5, 47 and 79 events, fewer
+than `MIN_TRAIN_EVENTS` (100), and 2024-01-01 has 216. At 2024-07-01 the
+post_kev train set has 275 events.
+
+**Split (printed by `split_data`; every leakage check passes).**
+
+| Cohort | Cut-off | Train rows | Train events | Test rows | Test events |
+|---|---|---:|---:|---:|---:|
+| full | 2024-07-01 | 167,592 | 903 | 43,213 | 199 |
+| post_kev | 2024-07-01 | 77,510 | 275 | 43,213 | 199 |
+
+**Results at 2024-07-01 (printed by `evaluate`; 95% bootstrap intervals).**
+
+| Cohort | Model | C-index | Brier skill 365 | P@100 |
+|---|---|---|---:|---|
+| post_kev | `cox` | 0.773 (0.741–0.805) | 0.0019 | 0.03 (0.01–0.05) |
+| post_kev | `cvss_rank` | 0.731 (0.697–0.764) | n/a | 0.05 (0.02–0.09) |
+| full | `cox` | 0.752 (0.717–0.786) | 0.0014 | 0.04 (0.01–0.08) |
+| full | `cvss_rank` | 0.731 (0.697–0.764) | n/a | 0.05 (0.02–0.09) |
+
+- The Cox model ranks better than CVSS by 0.042 in post_kev and 0.021 in
+  full. The intervals still overlap a little (post_kev: 0.741 against 0.764),
+  so the difference is not shown at the 95% level by these intervals. A paired
+  bootstrap of the difference (the same resamples are already used for both
+  models) would test it directly; it is not done yet.
+- P@100 is low for every model and slightly lower for Cox than for CVSS: the
+  top of the ranking is not better, only the overall order.
+- Brier skill over the no-feature reference stays below 0.002.
+- *Hazard ratios* (post_kev, 2024-07-01): CVSS 1.11 per point (1.07–1.15);
+  `exploit_at_publication` 3.28 (1.01–10.67); CWE-79 0.80 (0.67–0.95); CWE-89
+  0.76 (0.59–0.97).
+- *Proportional-hazards check* (post_kev 2024-07-01): none of the 19 features
+  is below p = 0.05.
+
+**Limitation: too few events at the early post_kev cut-offs.** At 2022-01-01,
+2022-07-01 and 2023-01-01 (5, 47 and 79 train events) the Cox model is
+unreliable, and at the first two it ranks worse than CVSS (section 15). These
+cut-offs are reported as a limitation, not as results.
+
+**How to check.** `uv run python -m vesper.components.b_survival.split_data`,
+then `uv run python -m vesper.components.b_survival.evaluate` (about 20
+minutes with 3 workers).
 
 ## How to check
 
