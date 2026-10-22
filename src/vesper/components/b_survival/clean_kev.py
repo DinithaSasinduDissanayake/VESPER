@@ -1,22 +1,4 @@
-"""
-Clean the CISA KEV catalogue into one row per CVE.
-
-KEV gives the "event" of the survival analysis: `dateAdded` is the day CISA
-confirmed that a CVE was exploited in the wild. Only the CVE ID and that date
-are kept. The date is an outcome, so it must never be used as a feature.
-
-Input:   data/raw/kev/kev_2026-10-01.json           (never changed)
-Output:  data/processed/b_survival/kev_clean.csv
-
-Columns of the output:
-    cve_id                   the CVE identifier (KEV field `cveID`)
-    date_added               day the CVE was added to KEV, as midnight UTC
-    added_on_kev_start_date  True if date_added is the day the catalogue started
-    after_snapshot           True if date_added is after the snapshot date
-
-Run from anywhere:
-    uv run python -m vesper.components.b_survival.clean_kev
-"""
+"""Clean the CISA KEV catalogue into one row per CVE."""
 
 import json
 

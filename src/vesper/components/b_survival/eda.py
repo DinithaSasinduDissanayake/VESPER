@@ -1,25 +1,4 @@
-"""
-First exploration (EDA) of the cleaned data of Component B.
-
-It reads the three clean tables, counts things and draws three figures. It is
-exploration only: the tables are joined in memory to count, the survival table
-is not built here, and no joined table is saved.
-
-Only CVEs published from STUDY_START up to SNAPSHOT_DATE are used, and only
-KEV and exploit dates up to SNAPSHOT_DATE.
-
-Days are counted between calendar days (UTC): a CVE that is listed in KEV on
-the day it is published has 0 days.
-
-Input:   data/processed/b_survival/nvd_clean.csv, kev_clean.csv, exploitdb_clean.csv
-Output:  outputs/b_survival/eda/01_cves_per_year.png
-         outputs/b_survival/eda/02_days_to_kev.png
-         outputs/b_survival/eda/03_days_to_kev_published_since_kev_start.png
-         outputs/b_survival/eda/eda_summary.csv   (every number that is printed)
-
-Run from anywhere (run the three clean_ modules first):
-    uv run python -m vesper.components.b_survival.eda
-"""
+"""First exploration (EDA) of the cleaned data of Component B."""
 
 import math
 

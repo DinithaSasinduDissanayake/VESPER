@@ -1,4 +1,4 @@
-"""Tests for evaluate.py that are not in test_cox_model.py. Small made-up data."""
+"""Tests for evaluate.py that are not in test_cox_model.py."""
 
 import numpy as np
 import pytest

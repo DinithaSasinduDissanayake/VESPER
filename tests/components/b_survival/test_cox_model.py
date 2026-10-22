@@ -1,4 +1,4 @@
-"""Tests for features, cox_model and evaluate. Small made-up data, no real files."""
+"""Tests for features, cox_model and evaluate."""
 
 import warnings
 from datetime import date

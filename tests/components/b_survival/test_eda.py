@@ -1,7 +1,4 @@
-"""Tests for the EDA calculations. They use small made-up tables, not the real files.
-
-The figures are not tested: they only draw the numbers that are tested here.
-"""
+"""Tests for the EDA calculations."""
 
 from datetime import date
 

@@ -1,9 +1,4 @@
-"""Leakage tests for features.py, alone and after split_data. Small made-up data.
-
-The encoder itself is also tested in test_cox_model.py. These tests check that
-nothing dated on or after the cut-off, and nothing made from the outcome, can
-change a train feature.
-"""
+"""Leakage tests for features.py, alone and after split_data."""
 
 from datetime import date
 

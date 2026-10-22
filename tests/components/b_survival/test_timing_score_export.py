@@ -1,8 +1,4 @@
-"""Tests for score_export. Small made-up data, no real files.
-
-D's file check (d_fusion.fusion._read_component) is called here, in a test only:
-Component B's code never imports another component.
-"""
+"""Tests for score_export."""
 
 import json
 from datetime import UTC, date, datetime

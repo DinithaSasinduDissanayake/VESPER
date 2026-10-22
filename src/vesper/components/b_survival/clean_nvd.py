@@ -1,45 +1,4 @@
-"""
-Clean the NVD records into one row per CVE.
-
-NVD gives the start of the survival clock, `published_at` (the day a CVE was
-disclosed), and the covariates: the CVSS score, the CVSS vector and the
-weakness types (CWE).
-
-Input:   data/raw/nvd/nvd_YYYY-MM.json.gz, one file per month   (never changed)
-Output:  data/processed/b_survival/nvd_clean.csv
-
-Columns of the output. Names follow vesper.contracts.vulnerability.Vulnerability
-where that record has the field:
-    cve_id                    the CVE identifier
-    published_at              when NVD published the CVE (UTC)
-    last_modified_at          when NVD last changed the record (UTC)
-    nvd_status                NVD's status of the record, for example "Analyzed"
-    cvss_base_score           CVSS base score, 0 to 10 (empty if missing)
-    cvss_version              "3.1" or "3.0" (empty if missing)
-    cvss_vector               the full CVSS vector text (empty if missing)
-    cvss_missing              True if the CVE has no CVSS 3.1 or 3.0 score
-    cvss_is_primary           True if the score used is NVD's own ("Primary"),
-                              False if it is from another source (empty if missing)
-    cvss_attack_vector        NETWORK, ADJACENT_NETWORK, LOCAL or PHYSICAL
-    cvss_attack_complexity    LOW or HIGH
-    cvss_privileges_required  NONE, LOW or HIGH
-    cvss_user_interaction     NONE or REQUIRED
-    cwe_ids                   CWE IDs separated by ";" (empty if none)
-    after_snapshot            True if published after the snapshot date
-    modified_after_snapshot   True if last modified after the snapshot date
-    snapshot_date             the snapshot date, the same in every row
-
-Two things to remember when this table is used:
-  - The values are the state of the record on the day it was downloaded, not
-    on the day the CVE was published. NVD often adds the CVSS score later.
-  - NVD copies the KEV date into some records (`cisaExploitAdd`). That is the
-    outcome, so this module never reads it.
-
-When reading the CSV again, read `cvss_version` as text, or "3.0" becomes 3.0.
-
-Run from anywhere:
-    uv run python -m vesper.components.b_survival.clean_nvd
-"""
+"""Clean the NVD records into one row per CVE."""
 
 import gzip
 import json

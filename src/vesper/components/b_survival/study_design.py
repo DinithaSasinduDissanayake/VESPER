@@ -1,9 +1,4 @@
-"""
-The study dates of Component B, kept in one place.
-
-Every step reads these values from here, so that each one is written only once.
-The reasons are in docs/COMPONENT_B_DATA_DECISIONS.md and docs/COMPONENT_B_DATA_SNAPSHOT.md.
-"""
+"""The study dates of Component B, kept in one place."""
 
 from datetime import date
 

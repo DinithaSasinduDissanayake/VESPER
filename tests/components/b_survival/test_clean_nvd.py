@@ -1,4 +1,4 @@
-"""Tests for clean_nvd. They use small made-up records, not the real NVD files."""
+"""Tests for clean_nvd."""
 
 import gzip
 import json

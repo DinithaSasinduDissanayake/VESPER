@@ -1,20 +1,4 @@
-"""
-Link the three clean sources into one table with one row per study CVE.
-
-NVD is the base table. KEV and ExploitDB are attached to it with a left join,
-so a CVE that is not in KEV (or has no exploit) keeps its row with empty
-fields. Nothing is decided here: the survival rules are in survival_table.py.
-
-Input:   data/processed/b_survival/nvd_clean.csv, kev_clean.csv, exploitdb_clean.csv
-Output:  none. The linked table is returned in memory for survival_table.py,
-         and a report of the joins is printed.
-
-Study CVEs are the NVD CVEs published from STUDY_START up to SNAPSHOT_DATE.
-The upper end uses the `after_snapshot` flags written by the clean_ modules.
-
-Run from anywhere (run the three clean_ modules first):
-    uv run python -m vesper.components.b_survival.link_sources
-"""
+"""Link the three clean sources into one table with one row per study CVE."""
 
 import pandas as pd
 

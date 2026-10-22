@@ -1,4 +1,4 @@
-"""Tests for split_data. They use small made-up tables, not the real files."""
+"""Tests for split_data."""
 
 from datetime import date
 

@@ -1,47 +1,4 @@
-"""
-Export Component B exploit-timing scores for Component D, as shared Score records.
-
-One row per CVE in the survival table published before the decision time. The
-status of each CVE is decided in this order:
-
-  already_exploited  listed in KEV before the decision day; empty score
-  not_eligible       outside the modelling cohort (post_kev: published before
-                     KEV_START_DATE); empty score
-  abstained          a model input is missing (no CVSS 3.x score), or the
-                     horizon reaches past the longest train follow-up, so the
-                     estimate would be extrapolated; empty score, with a reason
-  available          scored (see the two files below)
-
-Two files are written, with the same CVEs, statuses and reasons:
-
-  b_exploit_timing_probability.csv   the raw estimate: the Cox model's "listed
-      in KEV within the next HORIZON_DAYS days", given that the CVE is still
-      unlisted at the decision time:
-          raw = 1 - S(age + HORIZON_DAYS | x) / S(age | x)
-      where age = days from publication to the decision day. A CVE published
-      today gets 1 - S(HORIZON_DAYS | x). It has the form of a probability, but
-      its calibration has not been checked on held-out data, so its score_kind
-      is still ranking_score (CONTRIBUTING.md).
-
-  b_exploit_timing_scores.csv        the file Component D reads: the percentile
-      rank of the raw estimate among the AVAILABLE CVEs only, rank / N with tied
-      CVEs sharing the average rank, so it is in (0, 1]. The raw values are
-      about 1e-4, so on their own they would pull D's mean of 0-1 scores down;
-      the percentile puts B on the same scale as Component C's percentile.
-
-The model is fitted with the same rules as the evaluation: post_kev CVEs
-published before `trained_through`, re-censored at that day (split_data), CVEs
-without CVSS left out. By default trained_through = decision time = the start
-(00:00 UTC) of SNAPSHOT_DATE, the deployment setting. An earlier
-trained_through gives the model of an evaluation cut-off. trained_through is
-never after the decision time (the Score contract checks this).
-
-Output:  outputs/b_survival/b_exploit_timing_probability.csv (+ .metadata.json)
-         outputs/b_survival/b_exploit_timing_scores.csv      (+ .metadata.json)
-
-Run from anywhere (run survival_table first):
-    uv run python -m vesper.components.b_survival.score_export
-"""
+"""Export Component B exploit-timing scores for Component D, as shared Score records."""
 
 import dataclasses
 import json

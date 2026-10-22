@@ -1,4 +1,4 @@
-"""Tests for frontend_export. Small made-up data, no real files."""
+"""Tests for frontend_export."""
 
 import json
 from datetime import date
