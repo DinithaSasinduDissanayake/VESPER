@@ -14,6 +14,7 @@ from vesper.components.b_survival.score_history import (
     DECISION_DATES,
     METADATA_FILE,
     check_grid,
+    check_zeros,
     file_names,
     main,
     monthly_grid,
@@ -211,7 +212,7 @@ def test_main_writes_one_file_pair_per_t_that_passes_d_checks(table, tmp_path):
         raw = _read_component(folder / raw_name, "b_survival")
         assert set(frame["decision_time"]) == {start(day).isoformat()}
         assert set(frame["trained_through"]) == {start(day).isoformat()}
-        assert set(frame["model_version"]) == {f"b_survival-cox-percentile-{day}-0.1"}
+        assert set(frame["model_version"]) == {f"b_survival-cox-percentile-{day}-0.2"}
         assert frame["cve_id"].tolist() == raw["cve_id"].tolist()
         assert info["rows"] == len(frame)
         keys |= set(zip(frame["cve_id"], frame["decision_time"], strict=True))
@@ -228,3 +229,15 @@ def test_a_second_run_never_overwrites_the_first(table, tmp_path):
 
     assert (first.name, second.name) == ("run-001", "run-002")
     assert (first / METADATA_FILE).read_text() == before
+
+
+def test_check_zeros_writes_nothing_and_finds_no_zero(table, tmp_path):
+    settings = load_settings(tmp_path)
+    write_table(table, settings)
+
+    infos = check_zeros(settings, decision_dates=(EARLY, LATE), workers=1)
+
+    assert not (settings.outputs / "b_survival").exists()
+    assert [info["zero_raw_estimates"] for info in infos] == [0, 0]
+    assert all(info["min_raw_estimate"] > 0 for info in infos)
+    assert infos[0]["model_version"] == "b_survival-cox-percentile-2024-07-01-0.2"

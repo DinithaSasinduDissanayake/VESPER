@@ -96,10 +96,12 @@ point of view of the decision time it is not listed yet.
 
 ## Version rules
 
-- `model_version` is `b_survival-cox-<trained_through>-0.1` (raw) and
-  `b_survival-cox-percentile-<trained_through>-0.1` (percentile). Each history
+- `model_version` is `b_survival-cox-<trained_through>-0.2` (raw) and
+  `b_survival-cox-percentile-<trained_through>-0.2` (percentile). Each history
   decision time has its own model, so its own version.
-- The last number changes when the features or the method change.
+- The last number changes when the features or the method change. 0.2 uses
+  a piecewise-constant baseline hazard; 0.1 (history run-001) used lifelines'
+  step baseline and gave 17-32% exact zeros. Do not mix 0.1 and 0.2 rows.
 - A historical score is never replaced by one computed from newer data. A new
   run is a new folder.
 
@@ -119,10 +121,10 @@ is at most 2026-09-01, so every label window ends by the snapshot.
   fields are not.
 - **KEV and Exploit-DB dates are used as dated.** Deleted entries are missing,
   and backdated entries cannot be detected.
-- **Raw estimates of exactly 0.** The model's baseline only changes on days
-  when a train CVE was listed. For 17-32% of the available CVEs at each
-  decision time there is no such day in the next 30 days of their age, so the
-  raw estimate is exactly 0 and they all tie at the bottom of the percentile.
+- **Version 0.1 only: raw estimates of exactly 0.** The 0.1 baseline only
+  changed on days when a train CVE was listed, so 17-32% of the available CVEs
+  at each decision time scored exactly 0. Version 0.2 has no zeros (section 19
+  of the data-decisions page).
 - **A KEV listing is not the first attack.** B predicts KEV listing, which can
   come long after the first exploitation.
 - **Early decision times are not covered.** Before 2024-07-01 the post_kev

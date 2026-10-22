@@ -175,6 +175,9 @@ def score_one_time(table, day, snapshot_date=SNAPSHOT_DATE):
             state.value: int((raw_frame["status"] == state.value).sum()) for state in ScoreStatus
         },
         "zero_raw_estimates": int((raw_frame.loc[available, "score"] == 0).sum()),
+        "min_raw_estimate": float(raw_frame.loc[available, "score"].min())
+        if available.any()
+        else None,
     }
     return ranked_frame, raw_frame, info
 
@@ -217,6 +220,35 @@ def print_summary(infos):
             f"{counts['already_exploited']:>8}{counts['not_eligible']:>11}"
             f"{info['zero_raw_estimates']:>8}{info['seconds']:>7}"
         )
+
+
+def check_one_time(table_path, day):
+    """Worker: fit and score one decision time, write nothing. Returns its counts."""
+    _, _, info = score_one_time(load_survival_table(table_path), day)
+    return info
+
+
+def check_zeros(settings=None, decision_dates=DECISION_DATES, workers=None):
+    """Count raw estimates of exactly 0 per decision time. Writes no files."""
+    settings = settings or load_settings()
+    decision_dates = check_grid(decision_dates)
+    table_path = settings.data_processed / PROCESSED_SUBFOLDER / OUTPUT_FILE_NAME
+    workers = workers or min(len(decision_dates), os.cpu_count() or 1, MAX_WORKERS)
+    jobs = [(table_path, day) for day in decision_dates]
+    if workers == 1:
+        infos = [check_one_time(*job) for job in jobs]
+    else:
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            infos = list(pool.map(check_one_time, *zip(*jobs, strict=True)))
+    print()
+    print(f"{'decision':<12}{'available':>11}{'raw = 0':>9}{'min raw':>12}  model_version")
+    for info in infos:
+        print(
+            f"{info['decision_time'][:10]:<12}{info['status_counts']['available']:>11}"
+            f"{info['zero_raw_estimates']:>9}{info['min_raw_estimate']:>12.2e}  "
+            f"{info['model_version']}"
+        )
+    return infos
 
 
 def main(settings=None, decision_dates=DECISION_DATES, workers=None):
@@ -292,5 +324,11 @@ if __name__ == "__main__":
         help="comma-separated dates (00:00 UTC), for example 2025-01-01,2025-07-01",
     )
     parser.add_argument("--workers", type=int, default=None)
+    parser.add_argument(
+        "--check-zeros",
+        action="store_true",
+        help="only count raw estimates of exactly 0 per decision time; write nothing",
+    )
     arguments = parser.parse_args()
-    main(decision_dates=arguments.decision_times, workers=arguments.workers)
+    run = check_zeros if arguments.check_zeros else main
+    run(decision_dates=arguments.decision_times, workers=arguments.workers)

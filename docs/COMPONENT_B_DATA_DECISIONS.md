@@ -709,10 +709,33 @@ post_kev train set has 275 events.
 | full | `cvss_rank` | 0.731 (0.697–0.764) | n/a | 0.05 (0.02–0.09) |
 
 - The Cox model ranks better than CVSS by 0.042 in post_kev and 0.021 in
-  full. The intervals still overlap a little (post_kev: 0.741 against 0.764),
-  so the difference is not shown at the 95% level by these intervals. A paired
-  bootstrap of the difference (the same resamples are already used for both
-  models) would test it directly; it is not done yet.
+  full. The separate intervals of the two models overlap a little (post_kev:
+  0.741 against 0.764), but separate intervals are the wrong test for two
+  models measured on the same CVEs. The paired test is below.
+
+**Paired c-index difference, Cox minus CVSS (`c_index_differences.csv`).** On
+each of the same 1,000 bootstrap resamples, c-index(`cox`) − c-index
+(`cvss_rank`), with the 95% percentile interval:
+
+| Cohort | Cut-off | Difference | 95% interval | Excludes 0? |
+|---|---|---:|---|---|
+| post_kev | 2022-01-01 | −0.040 | −0.086 to +0.003 | no |
+| post_kev | 2022-07-01 | −0.018 | −0.057 to +0.025 | no |
+| post_kev | 2023-01-01 | +0.029 | +0.005 to +0.054 | yes |
+| post_kev | 2024-01-01 | +0.012 | −0.015 to +0.038 | no |
+| **post_kev** | **2024-07-01** | **+0.043** | **+0.024 to +0.063** | **yes** |
+| full | 2022-01-01 | +0.004 | −0.025 to +0.037 | no |
+| full | 2022-07-01 | +0.011 | −0.018 to +0.039 | no |
+| full | 2023-01-01 | +0.028 | +0.002 to +0.054 | yes |
+| full | 2024-01-01 | −0.004 | −0.025 to +0.017 | no |
+| full | 2024-07-01 | +0.021 | +0.004 to +0.039 | yes |
+
+**At the main cut-off (post_kev 2024-07-01) the interval excludes 0: the Cox
+model ranks the test CVEs better than CVSS, by 0.043 (0.024 to 0.063).** The
+result is not the same at every cut-off: at 2024-01-01 the interval includes
+0 in both cohorts, and at the two earliest post_kev cut-offs (5 and 47 train
+events) Cox is worse than CVSS, though not significantly. The ranking gain is
+in the overall order; P@100 is not better (below).
 - P@100 is low for every model and slightly lower for Cox than for CVSS: the
   top of the ranking is not better, only the overall order.
 - Brier skill over the no-feature reference stays below 0.002.
@@ -730,6 +753,76 @@ cut-offs are reported as a limitation, not as results.
 **How to check.** `uv run python -m vesper.components.b_survival.split_data`,
 then `uv run python -m vesper.components.b_survival.evaluate` (about 20
 minutes with 3 workers).
+
+## 19. Piecewise-constant baseline hazard
+
+**Problem.** lifelines' Breslow baseline survival is a step function that only
+drops on days when a train CVE was listed in KEV. Where a CVE's next 30 days of
+age contain no such day, the 30-day estimate 1 − S(age + 30) / S(age) is
+exactly 0. In the history run-001 (model version 0.1) 17.0–32.0% of the
+available CVEs at each decision time scored exactly 0 and tied at the bottom
+of the percentile (section 17).
+
+**Decision.** Keep the Cox coefficients from lifelines, and replace the
+baseline hazard by one that is constant within age bands
+(`BASELINE_BAND_EDGES` = 0, 30, 90, 180, 365, 730 days, the last open-ended, in
+`cox_model.py`). Neighbouring bands are merged, from the youngest age up, until
+each holds at least `MIN_BAND_EVENTS` = 10 train listings; a short last band
+joins the one before it. With the coefficients fixed, the rate of a band is
+its maximum-likelihood estimate:
+
+    rate = listings in the band / Σ over train CVEs of exp(x·β) × days at risk in the band
+
+and the estimates are S(t | x) = exp(−H0(t) · exp(x·β)), with H0 the sum of
+rate × days over the bands. Every band has listings, so no estimate is 0.
+
+**Bands at the main cut-off (2024-07-01).**
+
+| Cohort | Bands (start day) | Listings per band | Rate per day |
+|---|---|---|---|
+| post_kev | 0, 30, 90, 180, 365 | 169, 33, 37, 25, 11 | 7.1e-5, 7.5e-6, 6.4e-6, 2.6e-6, 8.4e-7 |
+| full | 0, 30, 90, 180, 365, 730 | 179, 59, 73, 109, 140, 343 | 3.4e-5, 5.8e-6, 5.0e-6, 3.9e-6, 3.0e-6, 3.0e-6 |
+
+In post_kev the 730+ band had fewer than 10 listings and was merged into 365+.
+The hazard in the first 30 days is about ten times the hazard later.
+
+**Reason for this option.** It is easy to explain and to check by hand, every
+band is supported by at least 10 listings, and the Cox coefficients (so the
+ranking by relative risk, the c-index and the hazard ratios) do not change.
+The band edges are a choice; they follow common reporting periods (one month,
+one quarter, half a year, one and two years).
+
+**Alternative considered: a kernel-smoothed baseline hazard** (Ramlau-Hansen):
+the same coefficients, with the Breslow hazard steps spread by a kernel of
+30–60 days. It gives a smooth curve with no steps at the band edges, but the
+bandwidth must be chosen and justified, and the estimate is less accurate near
+the youngest and oldest ages. A parametric (Weibull) baseline was also
+considered and not chosen: it assumes the hazard only rises or only falls with
+age and refits the coefficients.
+
+**Results.**
+
+- *c-index:* unchanged at every cut-off (it uses the relative risk only).
+- *Brier score, old (`cox_breslow`) against new (`cox`) baseline* (printed by
+  `evaluate`): the same to 4 significant digits at 30, 90 and 365 days for
+  every split that is not extrapolated. Brier skill at 365 days at the main
+  cut-off: post_kev 0.00192 (new) against 0.00187 (old); full 0.00134 against
+  0.00135.
+- *Where the 365-day horizon is extrapolated* (post_kev 2022-01-01 and
+  2022-07-01, longest train follow-up under 365 days) the new baseline is
+  worse: Brier skill −0.078 and −0.0055 against 0.0003 and −0.0001. The open
+  last band carries its rate past the follow-up, while the step curve stays
+  flat. These cut-offs are already a limitation (section 18), and the export
+  abstains beyond the train follow-up.
+- *Zeros:* the zero check (`score_history --check-zeros`, which writes no
+  files) finds **0** raw estimates of exactly 0 at all 27 decision times,
+  against 17.0–32.0% before. The smallest raw estimate per decision time is
+  7.4e-6 to 1.1e-5.
+
+**Version.** `MODEL_VERSION_SUFFIX` is 0.2 (current export and history), so
+scores from the old baseline (0.1, history run-001) and the new one cannot be
+mixed up. A new history run is needed:
+`uv run python -m vesper.components.b_survival.score_history`.
 
 ## How to check
 

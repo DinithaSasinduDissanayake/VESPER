@@ -128,9 +128,9 @@ def test_the_estimate_at_an_age_is_one_minus_a_ratio_of_survival(table):
     train = table[table["cvss_base_score"].notna() & ~table["already_exploited"]].head(500)
     cox = fit_cox(train)
     rows = train.head(10)
-    survival = cox.fitter.predict_survival_function(cox.features(rows), times=[200, 230])
+    survival = 1 - cox.listed_by(rows, (200, 230))
 
-    expected = 1 - survival.loc[230].to_numpy() / survival.loc[200].to_numpy()
+    expected = 1 - survival[:, 1] / survival[:, 0]
 
     assert cox.listed_within_next(rows, np.full(10, 200.0), 30) == pytest.approx(expected)
 
@@ -197,7 +197,7 @@ def test_every_record_has_aware_times_and_trained_through_not_after_decision(rec
         assert record.trained_through.tzinfo is not None
         assert record.trained_through <= record.decision_time
         assert record.horizon_days == HORIZON_DAYS
-        assert record.model_version == "b_survival-cox-2024-06-01-0.1"
+        assert record.model_version == "b_survival-cox-2024-06-01-0.2"
 
 
 def test_a_model_trained_after_the_decision_time_is_refused(table, model):
@@ -227,7 +227,7 @@ def test_the_scoring_model_sees_nothing_from_after_trained_through(table):
     ]
     assert model.train_rows == len(before)
     assert model.train_max_follow_up <= (cutoff.date() - date(2021, 11, 3)).days
-    assert model_version(cutoff) == "b_survival-cox-2023-01-01-0.1"
+    assert model_version(cutoff) == "b_survival-cox-2023-01-01-0.2"
 
 
 # --- Percentile scores ----------------------------------------------------------
@@ -246,7 +246,7 @@ def test_percentile_scores_keep_ids_statuses_and_reasons(records):
     for raw, new in zip(records, ranked, strict=True):
         assert (new.cve_id, new.status, new.reason) == (raw.cve_id, raw.status, raw.reason)
         assert (new.score is None) == (raw.score is None)
-        assert new.model_version == "b_survival-cox-percentile-2024-06-01-0.1"
+        assert new.model_version == "b_survival-cox-percentile-2024-06-01-0.2"
 
 
 def test_percentile_order_equals_raw_order(records):
@@ -311,7 +311,7 @@ def test_main_writes_both_files_with_the_same_cves_and_statuses(table, tmp_path)
     assert ranked["trained_through"].iloc[0] == datetime(2024, 6, 1, tzinfo=UTC).isoformat()
     metadata = json.loads((folder / "b_exploit_timing_scores.csv.metadata.json").read_text())
     assert metadata["source_file"] == "b_exploit_timing_probability.csv"
-    assert metadata["source_model_version"] == "b_survival-cox-2024-06-01-0.1"
+    assert metadata["source_model_version"] == "b_survival-cox-2024-06-01-0.2"
     assert metadata["percentile_population"] == int((raw["status"] == "available").sum())
 
 

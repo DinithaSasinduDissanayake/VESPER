@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from vesper.components.b_survival.evaluate import (
+    bootstrap_c_index_difference,
     bootstrap_metrics,
     brier_ipcw,
     c_index,
@@ -61,3 +62,37 @@ def test_bootstrap_uses_the_same_resamples_for_every_model():
     )
 
     assert intervals["a"] == intervals["b"]
+
+
+def test_paired_difference_has_the_full_set_point_inside_its_interval():
+    rng = np.random.default_rng(1)
+    time = rng.integers(1, 400, 300)
+    event = (rng.random(300) < 0.2).astype(int)
+    risk_a, risk_b = rng.random(300), rng.random(300)
+    listed = np.tile([0.1, 0.2, 0.3], (300, 1))
+
+    point, lower, upper = bootstrap_c_index_difference(time, event, risk_a, risk_b, n_resamples=50)
+    intervals = bootstrap_metrics(
+        time, event, {"a": (risk_a, listed), "b": (risk_b, listed)}, n_resamples=50
+    )
+
+    assert point == pytest.approx(
+        c_index_fast(time, event, risk_a) - c_index_fast(time, event, risk_b)
+    )
+    assert lower <= point <= upper
+    # Paired: the difference of
+    # two identical models is exactly 0 in every resample
+    same = bootstrap_c_index_difference(time, event, risk_a, risk_a.copy(), n_resamples=50)
+    assert same == (0.0, 0.0, 0.0)
+    assert intervals["a"]["c_index"][0] < intervals["a"]["c_index"][1]
+
+
+def test_a_clearly_better_ranking_has_a_difference_that_excludes_zero():
+    rng = np.random.default_rng(2)
+    risk = rng.random(400)
+    time = np.floor(rng.exponential(300 / np.exp(3 * risk))).astype(int) + 1
+    event = (time < 500).astype(int)
+
+    _, lower, _ = bootstrap_c_index_difference(time, event, risk, -risk, n_resamples=50)
+
+    assert lower > 0

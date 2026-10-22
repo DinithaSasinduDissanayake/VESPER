@@ -69,7 +69,8 @@ from vesper.contracts.score import Component, Score, ScoreKind, ScoreStatus
 # The look-ahead window, in days. Component D's fusion uses 30.
 HORIZON_DAYS = 30
 COHORT = "post_kev"
-MODEL_VERSION_SUFFIX = "0.1"
+# 0.2: piecewise-constant baseline hazard (0.1 used the Breslow step baseline)
+MODEL_VERSION_SUFFIX = "0.2"
 RAW_OUTPUT_FILE = "b_exploit_timing_probability.csv"
 OUTPUT_FILE = "b_exploit_timing_scores.csv"
 SCORE_COLUMNS = [
