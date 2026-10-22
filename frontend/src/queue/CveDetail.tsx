@@ -70,7 +70,7 @@ function SignalCard({ title, value, status, reason, note, digits = 3 }: {
           {displayScore(value, digits)}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-1 text-xs text-muted-foreground">
+      <CardContent className="flex flex-col gap-1 text-muted-foreground">
         {status && <p>Status: <span className="font-medium text-foreground">{status.replaceAll('_', ' ')}</span></p>}
         {reason && <p>{reason}</p>}
         {note && <p>{note}</p>}
@@ -87,7 +87,7 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
           <CardTitle>Description</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-start gap-2">
-          <p className="max-w-[80ch] whitespace-pre-wrap leading-6">{facts.description || 'No description is recorded in the local NVD snapshot.'}</p>
+          <p className="max-w-[80ch] text-base leading-7 whitespace-pre-wrap">{facts.description || 'No description is recorded in the local NVD snapshot.'}</p>
           <Button variant="link" className="px-0" asChild>
             <a
               href={`https://nvd.nist.gov/vuln/detail/${encodeURIComponent(facts.cve_id)}`}
@@ -118,8 +118,8 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
 
       <section className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="text-base font-medium">Risk and evidence signals</h3>
-          <p className="text-xs text-muted-foreground">Model ranking values come from the current Component D ranking; CVE facts come from the local NVD snapshot.</p>
+          <h3 className="text-lg font-medium">Risk and evidence signals</h3>
+          <p className="text-sm text-muted-foreground">Model ranking values come from the current Component D ranking; CVE facts come from the local NVD snapshot.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <SignalCard title="Provisional risk score · rank" value={candidate.risk_score} note={`Rank ${candidate.model_rank} · ${candidate.signals_used ?? '—'} of 5 signals used`} />
@@ -185,7 +185,7 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
             ['Baseline snapshot', candidate.baseline_snapshot_date],
           ].map(([label, value]) => (
             <div key={label} className="flex flex-col gap-1">
-              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="text-muted-foreground">{label}</p>
               <p className="font-medium">{value ?? 'Unavailable'}</p>
             </div>
           ))}
@@ -226,7 +226,7 @@ export function CveDetail({ candidate, onBack }: CveDetailProps) {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <p className="text-xs text-muted-foreground">Vulnerability record</p>
+          <p className="text-sm text-muted-foreground">Vulnerability record</p>
           <h2 className="font-mono text-2xl font-semibold tracking-tight">{candidate.cve_id}</h2>
           <p className="text-muted-foreground">Details from the local NVD snapshot and current Component D ranking.</p>
         </div>
@@ -246,7 +246,7 @@ export function CveDetail({ candidate, onBack }: CveDetailProps) {
           <AlertTitle>NVD details could not be loaded.</AlertTitle>
           <AlertDescription>
             <p>{error}</p>
-            <p className="text-xs">The ranking row is real; descriptive details require the local processed NVD file at data/processed/vulnerabilities.parquet.</p>
+            <p>The ranking row is real; descriptive details require the local processed NVD file at data/processed/vulnerabilities.parquet.</p>
           </AlertDescription>
         </Alert>
       ) : facts ? (

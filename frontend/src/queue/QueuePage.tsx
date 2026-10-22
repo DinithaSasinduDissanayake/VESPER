@@ -37,7 +37,7 @@ function saveCsv(blob: Blob, filename: string) {
 
 function RankingRows({ candidates, onSelect }: { candidates: PlannerCandidate[]; onSelect: (cveId: string) => void }) {
   return (
-    <Table>
+    <Table className="[&_td]:py-2.5 [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
       <TableHeader>
         <TableRow>
           <TableHead>Rank</TableHead>
@@ -134,14 +134,14 @@ export function QueuePage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold tracking-tight">Top prioritized vulnerabilities</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">Top prioritized vulnerabilities</h2>
             <Badge variant="outline">Provisional</Badge>
           </div>
           <p className="text-muted-foreground">
             Five-signal composite ranking; this is not a trained or validated model.
           </p>
           {ranking && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Showing top {topCandidates.length} of {ranking.count.toLocaleString()} CVEs
               {ranking.vulnerabilities[0]?.data_as_of
                 ? ` · data as of ${ranking.vulnerabilities[0].data_as_of}`
