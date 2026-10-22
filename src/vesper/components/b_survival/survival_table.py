@@ -31,7 +31,7 @@ Columns of the output, in four groups:
 The KEV date itself is NOT written to the table, so nobody can use it as an
 input by accident.
 
-The rules (each one is also explained in data_decisions.md):
+The rules (each one is also explained in docs/COMPONENT_B_DATA_DECISIONS.md):
   - Duration counts calendar days (UTC) and is the same as in eda.py.
   - A CVE listed on its publication day has duration 0 and stays an event.
   - A negative duration is not clipped. Those CVEs stay in the table and are
@@ -41,7 +41,7 @@ The rules (each one is also explained in data_decisions.md):
     says "this CVE has an exploit" would give a model information from the
     future (look-ahead leakage). Only exploit_at_publication is a Day-0 input.
   - CVSS and CWE are the values on the download days, not on the publication
-    day (see decision 3 in data_decisions.md), so results are "retrospective".
+    day (see decision 3 in docs/COMPONENT_B_DATA_DECISIONS.md), so results are "retrospective".
 
 Run from anywhere (run the three clean_ modules first):
     uv run python -m vesper.components.b_survival.survival_table

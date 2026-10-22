@@ -10,10 +10,13 @@ from lifelines import KaplanMeierFitter
 
 from vesper.components.b_survival.cox_model import (
     REQUIRED_COLUMNS,
+    cumulative_hazard,
     fit_cox,
     fit_models,
     hazard_ratios,
+    merge_bands,
     ph_check,
+    piecewise_baseline,
     predict_risk,
     predictions,
 )
@@ -196,7 +199,7 @@ def test_predictions_give_risks_and_listed_by_estimates(models):
 
     result = predictions(models, test)
 
-    assert set(result) == {"cox", "cvss_cox", "cvss_rank", "km_reference"}
+    assert set(result) == {"cox", "cox_breslow", "cvss_cox", "cvss_rank", "km_reference"}
     risk, listed = result["cox"]
     assert risk.shape == (40,) and listed.shape == (40, 3)
     assert np.all((listed >= 0) & (listed <= 1))
@@ -419,7 +422,13 @@ def test_main_writes_metrics_hazard_ratios_and_the_ph_check(tmp_path):
 
     assert output_dir == tmp_path / "outputs" / "b_survival" / "models"
     metrics = pd.read_csv(output_dir / "metrics.csv")
-    assert list(metrics["model"]) == ["cox", "cvss_cox", "cvss_rank", "km_reference"]
+    assert list(metrics["model"]) == [
+        "cox",
+        "cox_breslow",
+        "cvss_cox",
+        "cvss_rank",
+        "km_reference",
+    ]
     assert (metrics["train_left_out_no_cvss"] == 1).all()
     assert metrics["c_index"].between(0, 1).all()
     assert metrics.loc[metrics["model"] == "km_reference", "c_index"].iloc[0] == 0.5
@@ -447,3 +456,53 @@ def test_brier_skill_is_relative_to_the_km_reference_of_the_same_split():
     assert skill[1] == 0
     assert np.isnan(skill[2])
     assert skill[3] == 0
+
+
+# --- Piecewise-constant baseline hazard --------------------------------------
+
+
+def test_merge_bands_joins_bands_until_each_has_enough_events():
+    starts = (0, 30, 90, 180, 365, 730)
+
+    assert merge_bands(starts, [12, 3, 4, 5, 20, 2], min_events=10) == [0, 30, 365]
+    assert merge_bands(starts, [10, 10, 10, 10, 10, 10], min_events=10) == list(starts)
+    assert merge_bands(starts, [1, 1, 1, 1, 1, 1], min_events=10) == [0]
+
+
+def test_piecewise_rate_is_events_over_weighted_days_at_risk():
+    # Band 0-30: two events (days 10, 20); band 30+: one event (day 40)
+    durations = [10, 20, 40, 100]
+    events = [1, 1, 1, 0]
+    partial = [1.0, 2.0, 1.0, 0.5]
+
+    starts, rates = piecewise_baseline(durations, events, partial, edges=(0, 30))
+
+    # min_events=10 merges both bands into one: 3 events / (10 + 40 + 40 + 50) days
+    assert starts.tolist() == [0.0]
+    assert rates == pytest.approx([3 / (10 * 1 + 20 * 2 + 40 * 1 + 100 * 0.5)])
+
+
+def test_cumulative_hazard_adds_up_the_days_in_each_band():
+    starts, rates = np.array([0.0, 30.0]), np.array([0.01, 0.002])
+
+    values = cumulative_hazard(starts, rates, [0, 15, 30, 130])
+
+    assert values == pytest.approx([0, 0.15, 0.3, 0.3 + 100 * 0.002])
+
+
+def test_the_piecewise_baseline_never_gives_exactly_zero(models, train):
+    cox = models["cox"]
+    ages = np.linspace(0, cox.train_max_follow_up - 30, len(train))
+
+    estimates = cox.listed_within_next(train, ages, 30)
+
+    assert (estimates > 0).all()
+    assert (np.diff(cox.band_starts) > 0).all()
+    assert (cox.band_rates > 0).all()
+
+
+def test_cox_breslow_has_the_same_ranking_as_cox(models, train):
+    result = predictions(models, train.head(50))
+
+    assert result["cox_breslow"][0] == pytest.approx(result["cox"][0])
+    assert result["cox_breslow"][1].shape == result["cox"][1].shape

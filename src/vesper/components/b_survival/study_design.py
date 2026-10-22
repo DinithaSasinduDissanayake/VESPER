@@ -2,7 +2,7 @@
 The study dates of Component B, kept in one place.
 
 Every step reads these values from here, so that each one is written only once.
-The reasons are in data_decisions.md and data_snapshot.md.
+The reasons are in docs/COMPONENT_B_DATA_DECISIONS.md and docs/COMPONENT_B_DATA_SNAPSHOT.md.
 """
 
 from datetime import date
@@ -20,7 +20,17 @@ STUDY_START = date(2016, 1, 1)
 # Proposed, waiting for team agreement: the cut-off dates of the chronological
 # split. For each one, the model is trained on CVEs published before the date
 # and tested on CVEs published on or after it.
-CUTOFF_DATES = (date(2022, 1, 1), date(2022, 7, 1), date(2023, 1, 1), date(2024, 1, 1))
+# 2024-07-01 is the MAIN result: the earlier post_kev train sets have too few
+# events (5, 47, 79 and 216). The earlier cut-offs are kept, not deleted, so the
+# choice of dates stays visible (docs/COMPONENT_B_DATA_DECISIONS.md section 18).
+CUTOFF_DATES = (
+    date(2022, 1, 1),
+    date(2022, 7, 1),
+    date(2023, 1, 1),
+    date(2024, 1, 1),
+    date(2024, 7, 1),
+)
+MAIN_CUTOFF = date(2024, 7, 1)
 
 # Proposed, waiting for team agreement: the label-maturity filter. A CVE is
 # used for testing only if it was published at least this many days before

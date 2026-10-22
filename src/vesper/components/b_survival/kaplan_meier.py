@@ -10,7 +10,7 @@ close to 1 and is hard to read. The figures and tables therefore show the
 CUMULATIVE INCIDENCE, 1 - S(t): the share of CVEs listed in KEV by day t.
 
 The results are DESCRIPTIVE ONLY. CVSS and CWE are the values on the download
-days, not on the publication day (decision 3 in data_decisions.md), and a
+days, not on the publication day (decision 3 in docs/COMPONENT_B_DATA_DECISIONS.md), and a
 difference between groups is not a cause. This step does not predict anything;
 the models come later and use the chronological split.
 

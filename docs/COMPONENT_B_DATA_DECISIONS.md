@@ -2,7 +2,7 @@
 
 This file records the decisions made while cleaning the data, and the reason
 for each one. Every number was printed by a cleaning module on the raw files
-described in `data_snapshot.md` (snapshot date 2026-10-01). "How to check" at
+described in [COMPONENT_B_DATA_SNAPSHOT.md](COMPONENT_B_DATA_SNAPSHOT.md) (snapshot date 2026-10-01). "How to check" at
 the end gives the commands.
 
 ## 1. The study starts in 2016, not 2015
@@ -65,7 +65,7 @@ limit cannot be removed, only stated.
 ## 4. 3,355 CVEs were edited by NVD after the snapshot date
 
 **What I found.** The snapshot date is 2026-10-01, but 141 of the 142 NVD
-files were downloaded on 2026-10-06 (see `data_snapshot.md`). Records that NVD
+files were downloaded on 2026-10-06 (see [COMPONENT_B_DATA_SNAPSHOT.md](COMPONENT_B_DATA_SNAPSHOT.md)). Records that NVD
 edited between those days may hold values from after the snapshot.
 
 **The number.** 3,355 of the 316,477 CVEs kept have a last-modified date after
@@ -475,9 +475,11 @@ is 1.000. The censoring curve is therefore taken from the test set being
 evaluated, as in Graf et al. (1999). This uses only follow-up lengths, not
 model inputs.
 
-**Results.**
+**Results.** These were the results before the 2024-07-01 cut-off was added.
+The main result is now post_kev 2024-07-01 (section 18); every number below
+was reproduced exactly by the rerun.
 
-- *Ranking (main cohort, latest cut-off).* post_kev 2024-01-01: c-index 0.775
+- *Ranking (main cohort, then latest cut-off).* post_kev 2024-01-01: c-index 0.775
   (0.741–0.808) for `cox` against 0.763 (0.731–0.793) for `cvss_rank`. The
   intervals overlap, so the Cox model has not been shown to rank better than
   CVSS.
@@ -517,6 +519,311 @@ cohort: lifelines needs more than 10 minutes for its 147,000 train rows
   is not done yet; it is the comparison the research question asks for.
 - A paired bootstrap of the difference between `cox` and `cvss_rank` (the same
   resamples are already used for both) would test the difference directly.
+## 16. Score export to Component D
+
+**What I did.** `score_export` writes one shared `Score` record per CVE to
+`outputs/b_survival/b_exploit_timing_scores.csv`, the file Component D reads.
+The numbers below are printed by `score_export`.
+
+**Model and times.** The Cox model of section 15, fitted with the same rules:
+post_kev CVEs published before `trained_through`, re-censored at that day, CVEs
+without CVSS left out. By default `trained_through` = `decision_time` = 00:00
+UTC on the snapshot date (2026-10-01): train 208,290 rows, 788 events.
+`model_version` is `b_survival-cox-<trained_through>-0.1`.
+
+**Horizon.** 30 days (`HORIZON_DAYS`), the same as D's fusion.
+
+**Score.** For a CVE that is `age` days old at the decision time and still
+unlisted, the score is the model's "listed in KEV within the next 30 days":
+1 - S(age + 30 | x) / S(age | x). The plain 1 - S(30 | x) would treat a
+three-year-old CVE as if it were published today. `score_kind` is
+`ranking_score`, because the calibration of this estimate has not been checked
+on held-out data.
+
+**Statuses, in this order.**
+
+| Status | Rule | Rows |
+|---|---|---:|
+| already_exploited | KEV day before the decision day | 1,534 |
+| not_eligible | published before KEV_START_DATE (outside post_kev) | 89,401 |
+| abstained | no CVSS 3.x score | 9,745 |
+| abstained | age + 30 days is past the longest train follow-up (not extrapolated) | 1,453 |
+| available | scored | 206,049 |
+
+**Score distribution (available rows).** Median 0.00003, 90th percentile
+0.00026, 99th percentile 0.00079, maximum 0.00233, mean 0.00010. The values are
+small because a KEV listing within 30 days is rare: 788 events in 208,290
+train CVEs over up to about five years.
+
+**Two files: raw estimate and percentile.** The raw estimates are about
+1e-4, while D's fusion takes a plain mean of 0-1 inputs (normalised CVSS,
+EPSS, A, B, C). Raw B scores would pull every mean down and hardly change the
+order, so B would not count fairly. B therefore follows Component C's pattern
+and writes two files with the same CVEs, statuses and reasons:
+
+- `b_exploit_timing_probability.csv`: the raw 30-day estimate,
+  `model_version` `b_survival-cox-2026-10-01-0.1`. Its `score_kind` stays
+  `ranking_score`, because its calibration is not validated.
+- `b_exploit_timing_scores.csv` (the file D reads): the percentile rank of the
+  raw estimate among the 206,049 available CVEs only, rank / N with tied CVEs
+  sharing the average rank, so it is in (0, 1]. `model_version`
+  `b_survival-cox-percentile-2026-10-01-0.1`. Its metadata names the raw file
+  and model it came from.
+
+Reason: same scale as C, so D's mean is fair. One difference from C: C uses
+(rank - 1) / (N - 1), in [0, 1]; B uses rank / N, in (0, 1], so no available
+CVE gets exactly 0.
+
+**Limitation: raw estimates of exactly 0.** 35,525 of the 206,049 available
+CVEs (17.2%) have a raw estimate of exactly 0, all tied at percentile 0.086.
+The Cox baseline survival S0 is a step function that only drops on days when
+a train CVE was listed. For older CVEs there are 30-day stretches of age with
+no train listing, so S0 is flat there and the estimate is 0. The true chance is
+small but not 0. A smoothed baseline hazard would fix this; it is not done yet.
+
+**How to check.** `uv run python -m vesper.components.b_survival.score_export`
+prints the model, the rows per status and the raw score distribution. The
+percentile distribution is in `b_exploit_timing_scores.csv.metadata.json`
+(min 0.086, median 0.500, max 1.0).
+
+## 17. Historical score snapshots for Component D
+
+**What I did.** Component D needs past B scores to train and evaluate fusion.
+`score_history` replays B at each decision time T of a grid, using only data
+dated before T, and writes one pair of files per T. The numbers below are
+printed by `score_history` and stored in `history.metadata.json` (run-001).
+
+**Decision grid.** 00:00 UTC on the 1st of each month, 2024-07-01 to
+2026-09-01: 27 dates (`DECISION_DATES`, or `--decision-times` on the command
+line). Reasons:
+
+- Start 2024-07-01: before it, the post_kev train sets are small (5, 47, 79
+  and 216 events at the four cut-offs of section 12; only 2024-01-01 reaches
+  `MIN_TRAIN_EVENTS`). At 2024-07-01 the train set has 275 events.
+- End 2026-09-01: D's label window is T + 30 days, and it must end by the
+  snapshot (2026-10-01). `check_grid` refuses any later date.
+
+**Method, for each T.**
+
+1. Fit the Cox model on post_kev CVEs published before T, re-censored at T,
+   with exploit dates on or after T removed (the rules of section 12, through
+   `split_data.split_at_cutoff`). `trained_through` = T.
+2. Score every study CVE published before T with the export rules of
+   section 16: the conditional 30-day estimate with age measured at T, and the
+   same statuses and reasons. A CVE listed in KEV before T is
+   `already_exploited`; one listed on or after T is scored normally.
+3. Rank the raw estimates among the CVEs available at that T (rank / N, ties
+   share the average rank).
+
+`model_version` is `b_survival-cox-percentile-<T>-0.1` (percentile) and
+`b_survival-cox-<T>-0.1` (raw). `snapshot_date` is 2026-10-01 for every row.
+B does not label: D adds `kev_within_horizon`.
+
+**Output format.** The two history files would be 1.19 GB (percentile) and
+1.13 GB (raw) as single CSVs, 5.89 million rows each. A single file would also
+fail D's per-CVE check, which allows one row per CVE ID. So each T gets its own
+pair of CSVs (25-60 MB each), sorted by `cve_id`, which pass D's check
+unchanged. Each run gets a new folder `history/run-NNN`; an existing run is
+never overwritten.
+
+**Numbers per decision time (run-001).**
+
+| Decision time | Train rows | Train events | Rows | Available | Abstained | Already exploited | Not eligible | Raw = 0 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2024-07-01 | 77,459 | 275 | 167,645 | 75,730 | 1,505 | 956 | 89,454 | 23,210 (30.6%) |
+| 2024-08-01 | 80,538 | 288 | 170,758 | 78,796 | 1,539 | 969 | 89,454 | 25,197 (32.0%) |
+| 2024-09-01 | 83,408 | 303 | 173,654 | 81,651 | 1,565 | 988 | 89,450 | 25,171 (30.8%) |
+| 2024-10-01 | 85,903 | 316 | 176,168 | 84,133 | 1,584 | 1,009 | 89,442 | 24,704 (29.4%) |
+| 2024-11-01 | 89,411 | 333 | 179,732 | 87,624 | 1,640 | 1,026 | 89,442 | 28,023 (32.0%) |
+| 2024-12-01 | 93,395 | 351 | 183,788 | 91,591 | 1,710 | 1,047 | 89,440 | 27,821 (30.4%) |
+| 2025-01-01 | 96,745 | 364 | 187,219 | 94,928 | 1,790 | 1,063 | 89,438 | 27,946 (29.4%) |
+| 2025-02-01 | 100,956 | 376 | 191,494 | 99,127 | 1,854 | 1,077 | 89,436 | 30,381 (30.6%) |
+| 2025-03-01 | 104,562 | 398 | 195,167 | 102,711 | 1,921 | 1,104 | 89,431 | 29,293 (28.5%) |
+| 2025-04-01 | 108,435 | 426 | 199,165 | 106,556 | 2,046 | 1,136 | 89,427 | 28,032 (26.3%) |
+| 2025-05-01 | 112,353 | 440 | 203,199 | 110,460 | 2,162 | 1,151 | 89,426 | 31,366 (28.4%) |
+| 2025-06-01 | 116,200 | 464 | 207,179 | 114,283 | 2,295 | 1,175 | 89,426 | 28,441 (24.9%) |
+| 2025-07-01 | 119,744 | 482 | 210,860 | 117,809 | 2,432 | 1,195 | 89,424 | 28,868 (24.5%) |
+| 2025-08-01 | 123,274 | 498 | 214,636 | 121,323 | 2,678 | 1,215 | 89,420 | 29,964 (24.7%) |
+| 2025-09-01 | 126,620 | 507 | 218,264 | 124,660 | 2,958 | 1,228 | 89,418 | 29,998 (24.1%) |
+| 2025-10-01 | 130,780 | 520 | 222,585 | 128,807 | 3,118 | 1,244 | 89,416 | 30,344 (23.6%) |
+| 2025-11-01 | 134,707 | 542 | 226,858 | 132,712 | 3,464 | 1,269 | 89,413 | 29,048 (21.9%) |
+| 2025-12-01 | 137,505 | 552 | 229,879 | 135,500 | 3,687 | 1,280 | 89,412 | 30,223 (22.3%) |
+| 2026-01-01 | 142,125 | 566 | 235,371 | 140,106 | 4,555 | 1,300 | 89,410 | 31,644 (22.6%) |
+| 2026-02-01 | 146,179 | 581 | 239,673 | 144,145 | 4,803 | 1,316 | 89,409 | 34,032 (23.6%) |
+| 2026-03-01 | 150,594 | 605 | 244,289 | 148,536 | 5,004 | 1,343 | 89,406 | 32,001 (21.5%) |
+| 2026-04-01 | 156,723 | 628 | 250,523 | 154,642 | 5,109 | 1,369 | 89,403 | 32,524 (21.0%) |
+| 2026-05-01 | 162,404 | 656 | 256,333 | 160,295 | 5,238 | 1,398 | 89,402 | 31,108 (19.4%) |
+| 2026-06-01 | 168,955 | 672 | 263,270 | 166,830 | 5,624 | 1,414 | 89,402 | 32,769 (19.6%) |
+| 2026-07-01 | 176,378 | 695 | 271,212 | 174,230 | 6,143 | 1,437 | 89,402 | 34,934 (20.1%) |
+| 2026-08-01 | 185,400 | 720 | 280,982 | 183,227 | 6,891 | 1,462 | 89,402 | 38,086 (20.8%) |
+| 2026-09-01 | 195,945 | 747 | 293,240 | 193,745 | 8,603 | 1,491 | 89,401 | 32,867 (17.0%) |
+
+Run time: 207 s with 3 parallel workers (about 20 s and 0.8 GB per decision
+time). The 2.3 GB of output is in `outputs/`, which git ignores.
+
+**What cannot be reconstructed (limits).**
+
+- **Retrospective replay, not a point-in-time record.** The NVD fields (CVSS
+  score and vector, CWE) come from the current NVD snapshot, not as they were
+  at T. A CVSS score that NVD added or changed after T is used at T, so some
+  information from after T leaks into the inputs. The same applies to which
+  CVEs have no CVSS (abstained).
+- **KEV and Exploit-DB dates are used as dated.** A KEV entry or Exploit-DB
+  record deleted before the snapshot is missing, and a backdated entry cannot
+  be detected.
+- **Raw estimates of exactly 0 (section 16) at every T,** 17-32% of the
+  available CVEs (last column). They tie at the bottom of the percentile.
+- `not_eligible` falls slightly over time (89,454 to 89,401) because older
+  CVEs listed in KEV before T are `already_exploited` first.
+
+**How to check.** `uv run python -m vesper.components.b_survival.score_history`
+prints the table above and writes a new run folder.
+
+## 18. The 2024-07-01 cut-off: the main result
+
+**Decision.** `date(2024, 7, 1)` is added to `CUTOFF_DATES` and is the main
+result (`MAIN_CUTOFF` in `study_design.py`). The four earlier cut-offs are
+kept, not deleted: deleting them would look like choosing dates until the
+results look good. Its test window ends on 2025-06-30, so 2024-07-01 + 365 days
+(2025-07-01) is before the snapshot (2026-10-01) and every test CVE has the
+full maturity follow-up.
+
+**Reason.** The earlier post_kev train sets have 5, 47 and 79 events, fewer
+than `MIN_TRAIN_EVENTS` (100), and 2024-01-01 has 216. At 2024-07-01 the
+post_kev train set has 275 events.
+
+**Split (printed by `split_data`; every leakage check passes).**
+
+| Cohort | Cut-off | Train rows | Train events | Test rows | Test events |
+|---|---|---:|---:|---:|---:|
+| full | 2024-07-01 | 167,592 | 903 | 43,213 | 199 |
+| post_kev | 2024-07-01 | 77,510 | 275 | 43,213 | 199 |
+
+**Results at 2024-07-01 (printed by `evaluate`; 95% bootstrap intervals).**
+
+| Cohort | Model | C-index | Brier skill 365 | P@100 |
+|---|---|---|---:|---|
+| post_kev | `cox` | 0.773 (0.741–0.805) | 0.0019 | 0.03 (0.01–0.05) |
+| post_kev | `cvss_rank` | 0.731 (0.697–0.764) | n/a | 0.05 (0.02–0.09) |
+| full | `cox` | 0.752 (0.717–0.786) | 0.0014 | 0.04 (0.01–0.08) |
+| full | `cvss_rank` | 0.731 (0.697–0.764) | n/a | 0.05 (0.02–0.09) |
+
+- The Cox model ranks better than CVSS by 0.042 in post_kev and 0.021 in
+  full. The separate intervals of the two models overlap a little (post_kev:
+  0.741 against 0.764), but separate intervals are the wrong test for two
+  models measured on the same CVEs. The paired test is below.
+
+**Paired c-index difference, Cox minus CVSS (`c_index_differences.csv`).** On
+each of the same 1,000 bootstrap resamples, c-index(`cox`) − c-index
+(`cvss_rank`), with the 95% percentile interval:
+
+| Cohort | Cut-off | Difference | 95% interval | Excludes 0? |
+|---|---|---:|---|---|
+| post_kev | 2022-01-01 | −0.040 | −0.086 to +0.003 | no |
+| post_kev | 2022-07-01 | −0.018 | −0.057 to +0.025 | no |
+| post_kev | 2023-01-01 | +0.029 | +0.005 to +0.054 | yes |
+| post_kev | 2024-01-01 | +0.012 | −0.015 to +0.038 | no |
+| **post_kev** | **2024-07-01** | **+0.043** | **+0.024 to +0.063** | **yes** |
+| full | 2022-01-01 | +0.004 | −0.025 to +0.037 | no |
+| full | 2022-07-01 | +0.011 | −0.018 to +0.039 | no |
+| full | 2023-01-01 | +0.028 | +0.002 to +0.054 | yes |
+| full | 2024-01-01 | −0.004 | −0.025 to +0.017 | no |
+| full | 2024-07-01 | +0.021 | +0.004 to +0.039 | yes |
+
+**At the main cut-off (post_kev 2024-07-01) the interval excludes 0: the Cox
+model ranks the test CVEs better than CVSS, by 0.043 (0.024 to 0.063).** The
+result is not the same at every cut-off: at 2024-01-01 the interval includes
+0 in both cohorts, and at the two earliest post_kev cut-offs (5 and 47 train
+events) Cox is worse than CVSS, though not significantly. The ranking gain is
+in the overall order; P@100 is not better (below).
+- P@100 is low for every model and slightly lower for Cox than for CVSS: the
+  top of the ranking is not better, only the overall order.
+- Brier skill over the no-feature reference stays below 0.002.
+- *Hazard ratios* (post_kev, 2024-07-01): CVSS 1.11 per point (1.07–1.15);
+  `exploit_at_publication` 3.28 (1.01–10.67); CWE-79 0.80 (0.67–0.95); CWE-89
+  0.76 (0.59–0.97).
+- *Proportional-hazards check* (post_kev 2024-07-01): none of the 19 features
+  is below p = 0.05.
+
+**Limitation: too few events at the early post_kev cut-offs.** At 2022-01-01,
+2022-07-01 and 2023-01-01 (5, 47 and 79 train events) the Cox model is
+unreliable, and at the first two it ranks worse than CVSS (section 15). These
+cut-offs are reported as a limitation, not as results.
+
+**How to check.** `uv run python -m vesper.components.b_survival.split_data`,
+then `uv run python -m vesper.components.b_survival.evaluate` (about 20
+minutes with 3 workers).
+
+## 19. Piecewise-constant baseline hazard
+
+**Problem.** lifelines' Breslow baseline survival is a step function that only
+drops on days when a train CVE was listed in KEV. Where a CVE's next 30 days of
+age contain no such day, the 30-day estimate 1 − S(age + 30) / S(age) is
+exactly 0. In the history run-001 (model version 0.1) 17.0–32.0% of the
+available CVEs at each decision time scored exactly 0 and tied at the bottom
+of the percentile (section 17).
+
+**Decision.** Keep the Cox coefficients from lifelines, and replace the
+baseline hazard by one that is constant within age bands
+(`BASELINE_BAND_EDGES` = 0, 30, 90, 180, 365, 730 days, the last open-ended, in
+`cox_model.py`). Neighbouring bands are merged, from the youngest age up, until
+each holds at least `MIN_BAND_EVENTS` = 10 train listings; a short last band
+joins the one before it. With the coefficients fixed, the rate of a band is
+its maximum-likelihood estimate:
+
+    rate = listings in the band / Σ over train CVEs of exp(x·β) × days at risk in the band
+
+and the estimates are S(t | x) = exp(−H0(t) · exp(x·β)), with H0 the sum of
+rate × days over the bands. Every band has listings, so no estimate is 0.
+
+**Bands at the main cut-off (2024-07-01).**
+
+| Cohort | Bands (start day) | Listings per band | Rate per day |
+|---|---|---|---|
+| post_kev | 0, 30, 90, 180, 365 | 169, 33, 37, 25, 11 | 7.1e-5, 7.5e-6, 6.4e-6, 2.6e-6, 8.4e-7 |
+| full | 0, 30, 90, 180, 365, 730 | 179, 59, 73, 109, 140, 343 | 3.4e-5, 5.8e-6, 5.0e-6, 3.9e-6, 3.0e-6, 3.0e-6 |
+
+In post_kev the 730+ band had fewer than 10 listings and was merged into 365+.
+The hazard in the first 30 days is about ten times the hazard later.
+
+**Reason for this option.** It is easy to explain and to check by hand, every
+band is supported by at least 10 listings, and the Cox coefficients (so the
+ranking by relative risk, the c-index and the hazard ratios) do not change.
+The band edges are a choice; they follow common reporting periods (one month,
+one quarter, half a year, one and two years).
+
+**Alternative considered: a kernel-smoothed baseline hazard** (Ramlau-Hansen):
+the same coefficients, with the Breslow hazard steps spread by a kernel of
+30–60 days. It gives a smooth curve with no steps at the band edges, but the
+bandwidth must be chosen and justified, and the estimate is less accurate near
+the youngest and oldest ages. A parametric (Weibull) baseline was also
+considered and not chosen: it assumes the hazard only rises or only falls with
+age and refits the coefficients.
+
+**Results.**
+
+- *c-index:* unchanged at every cut-off (it uses the relative risk only).
+- *Brier score, old (`cox_breslow`) against new (`cox`) baseline* (printed by
+  `evaluate`): the same to 4 significant digits at 30, 90 and 365 days for
+  every split that is not extrapolated. Brier skill at 365 days at the main
+  cut-off: post_kev 0.00192 (new) against 0.00187 (old); full 0.00134 against
+  0.00135.
+- *Where the 365-day horizon is extrapolated* (post_kev 2022-01-01 and
+  2022-07-01, longest train follow-up under 365 days) the new baseline is
+  worse: Brier skill −0.078 and −0.0055 against 0.0003 and −0.0001. The open
+  last band carries its rate past the follow-up, while the step curve stays
+  flat. These cut-offs are already a limitation (section 18), and the export
+  abstains beyond the train follow-up.
+- *Zeros:* the zero check (`score_history --check-zeros`, which writes no
+  files) finds **0** raw estimates of exactly 0 at all 27 decision times,
+  against 17.0–32.0% before. The smallest raw estimate per decision time is
+  7.4e-6 to 1.1e-5.
+
+**Version.** `MODEL_VERSION_SUFFIX` is 0.2 (current export and history), so
+scores from the old baseline (0.1, history run-001) and the new one cannot be
+mixed up. A new history run is needed:
+`uv run python -m vesper.components.b_survival.score_history`.
+
 ## How to check
 
 Run from the repository root. Each command prints the report that the numbers
@@ -551,3 +858,25 @@ uv run python -m vesper.components.b_survival.evaluate
   `kaplan_meier`.
 - Decision 15: the table and the "left out without CVSS" and "censoring G(365)"
   lines printed by `evaluate`; hazard_ratios.csv and ph_check.csv.
+
+## Possible move to vesper.eval
+
+CONTRIBUTING.md asks that results come from the shared code in `vesper.eval`,
+so that every component is measured the same way. `src/vesper/eval/` is still
+empty, so Component B's metrics live in `b_survival/evaluate.py`. Nothing has
+been moved yet. These functions have no Component B logic and could move to
+`vesper.eval` once the team agrees:
+
+- `c_index_fast`: Harrell's c-index, the same definition as lifelines, fast
+  enough for the bootstrap.
+- `brier_ipcw`, with `censoring_survival` and `km_value`: the Brier score at
+  day t with inverse probability of censoring weights (Graf et al. 1999).
+- `precision_at_k`: precision of the top k, with ties at the k-th place shared
+  out evenly.
+- `bootstrap_metrics`: 95% percentile intervals with the same resamples for
+  every model, so models can be compared.
+- `add_brier_skill`: Brier skill against the Kaplan-Meier reference of the
+  same split.
+
+`listed_within` and the per-split code (`evaluate_split`, `run_split`, `main`)
+are specific to Component B and would stay in `b_survival`.
