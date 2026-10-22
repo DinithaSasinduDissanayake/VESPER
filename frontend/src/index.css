@@ -88,7 +88,7 @@
     /* Page canvas behind the cards. */
     /* One colour per evidence stream, used for small markers only. */
     --stream-text: oklch(0.6 0.11 190);
-    --stream-timing: oklch(0.72 0.15 70);
+    --stream-timing: oklch(0.67 0.16 58);
     --stream-structure: var(--structural);
     --stream-ranking: oklch(0.6 0.2 350);
     --surface: oklch(0.976 0.007 277);
@@ -172,6 +172,11 @@
   /* A soft lift so white cards read against the tinted surface. */
   [data-slot="card"] {
     @apply shadow-[0_1px_2px_oklch(0.25_0.03_277/0.05),0_8px_24px_-16px_oklch(0.25_0.03_277/0.18)];
+  }
+
+  /* Quiet tinted header row for every table. */
+  [data-slot="table-header"] [data-slot="table-row"] {
+    @apply bg-muted;
   }
 
   ::selection {
