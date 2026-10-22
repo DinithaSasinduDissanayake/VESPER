@@ -1180,6 +1180,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "joblib" },
     { name = "lifelines" },
     { name = "matplotlib" },
     { name = "networkx" },
@@ -1202,6 +1203,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "joblib", specifier = ">=1.4" },
     { name = "lifelines", specifier = ">=0.30.3" },
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "networkx", specifier = ">=3.6.1" },

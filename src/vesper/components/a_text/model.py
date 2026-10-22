@@ -44,18 +44,30 @@ def clean_texts(texts) -> list[str]:
 def build_features() -> Pipeline:
     """Sanitise, build word (1-2) and char_wb (3-5) TF-IDF blocks, then L2-normalise."""
     word = TfidfVectorizer(
-        ngram_range=(1, 2), stop_words=STOP_WORDS, min_df=2, max_features=65_536,
-        sublinear_tf=True, norm=None, dtype=np.float32,
+        ngram_range=(1, 2),
+        stop_words=STOP_WORDS,
+        min_df=2,
+        max_features=65_536,
+        sublinear_tf=True,
+        norm=None,
+        dtype=np.float32,
     )
     char = TfidfVectorizer(
-        analyzer="char_wb", ngram_range=(3, 5), min_df=2, max_features=32_768,
-        sublinear_tf=True, norm=None, dtype=np.float32,
+        analyzer="char_wb",
+        ngram_range=(3, 5),
+        min_df=2,
+        max_features=32_768,
+        sublinear_tf=True,
+        norm=None,
+        dtype=np.float32,
     )
-    return Pipeline([
-        ("clean", FunctionTransformer(clean_texts)),
-        ("terms", FeatureUnion([("word", word), ("char", char)])),
-        ("norm", Normalizer()),
-    ])
+    return Pipeline(
+        [
+            ("clean", FunctionTransformer(clean_texts)),
+            ("terms", FeatureUnion([("word", word), ("char", char)])),
+            ("norm", Normalizer()),
+        ]
+    )
 
 
 def sample_training(train: pd.DataFrame) -> tuple[pd.DataFrame, float]:
