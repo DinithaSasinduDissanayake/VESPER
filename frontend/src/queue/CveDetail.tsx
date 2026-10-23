@@ -171,7 +171,7 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
         </CardHeader>
         <CardContent className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           {[
-            ['Text snapshot', candidate.snapshot_date_a],
+            ['Text (A) score file date', candidate.snapshot_date_a],
             ['Timing snapshot', candidate.snapshot_date_b],
             ['Structural signal snapshot', candidate.snapshot_date_c],
             ['Baseline snapshot', candidate.baseline_snapshot_date],
