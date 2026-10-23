@@ -38,7 +38,7 @@ export const pages: Record<PageId, Page> = {
     icon: CalendarDays,
   },
   analyse: {
-    title: 'Add / analyse',
+    title: 'Analyse a new CVE',
     icon: CirclePlus,
   },
   scores: {

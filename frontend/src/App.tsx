@@ -1,6 +1,7 @@
-import { useState, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { AnalysePage } from '@/analyse/AnalysePage'
+import { warmUpTextModel } from '@/api/aText'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { mainNav, pages, type PageId } from '@/pages'
@@ -74,6 +75,8 @@ function App() {
   const PageComponent = activeId === 'home' ? null : pageComponents[activeId]
   // Sidebar links and the logo all just switch the page.
   const goTo = setActiveId
+  // Load the text model on the backend while the user is still on another page.
+  useEffect(warmUpTextModel, [])
 
   return (
     <div className="flex min-h-svh flex-col bg-surface md:flex-row">
