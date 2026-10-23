@@ -109,11 +109,6 @@ function App() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur sm:px-6">
-          {page.icon && (
-            <span className="grid size-8 place-items-center rounded-lg bg-accent text-accent-foreground">
-              <page.icon className="size-4" />
-            </span>
-          )}
           <h1 className="text-base font-semibold tracking-tight">{page.title}</h1>
         </header>
 
