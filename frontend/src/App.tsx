@@ -104,14 +104,6 @@ function App() {
           ))}
         </nav>
 
-        <nav aria-label="Help" className="flex flex-col border-t p-3">
-          <NavItem
-            id="scores"
-            activeId={activeId}
-            onSelect={goTo}
-            className="text-muted-foreground"
-          />
-        </nav>
       </aside>
       </div>
 
