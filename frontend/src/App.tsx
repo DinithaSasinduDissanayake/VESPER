@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentType } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { AnalysePage } from '@/analyse/AnalysePage'
 import { warmUpTextModel } from '@/api/aText'
+import { PageErrorBoundary } from '@/components/PageErrorBoundary'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { mainNav, pages, type PageId } from '@/pages'
@@ -123,11 +124,13 @@ function App() {
 
         {/* key resets the page's state (e.g. the open CVE) when the page changes. */}
         <main className="min-w-0 flex-1 p-4 text-base sm:p-6 lg:p-8">
-          {activeId === 'home' ? (
-            <HomePage key={activeId} onNavigate={goTo} />
-          ) : (
-            PageComponent && <PageComponent key={activeId} />
-          )}
+          <PageErrorBoundary key={activeId}>
+            {activeId === 'home' ? (
+              <HomePage key={activeId} onNavigate={goTo} />
+            ) : (
+              PageComponent && <PageComponent key={activeId} />
+            )}
+          </PageErrorBoundary>
         </main>
       </div>
     </div>
