@@ -74,8 +74,17 @@ function App() {
   const [activeId, setActiveId] = useState<PageId>('home')
   const page = pages[activeId]
   const PageComponent = activeId === 'home' ? null : pageComponents[activeId]
+  // CVE to open when the queue is reached from the Home top list.
+  const [openCveId, setOpenCveId] = useState<string | null>(null)
   // Sidebar links and the logo all just switch the page.
-  const goTo = setActiveId
+  const goTo = (id: PageId) => {
+    setOpenCveId(null)
+    setActiveId(id)
+  }
+  const openCve = (cveId: string) => {
+    setOpenCveId(cveId)
+    setActiveId('queue')
+  }
   // Load the text model on the backend while the user is still on another page.
   useEffect(warmUpTextModel, [])
 
@@ -116,7 +125,9 @@ function App() {
         <main className="min-w-0 flex-1 p-4 text-base sm:p-6 lg:p-8">
           <PageErrorBoundary key={activeId}>
             {activeId === 'home' ? (
-              <HomePage key={activeId} onNavigate={goTo} />
+              <HomePage key={activeId} onNavigate={goTo} onOpenCve={openCve} />
+            ) : activeId === 'queue' ? (
+              <QueuePage key={activeId} initialCveId={openCveId} />
             ) : (
               PageComponent && <PageComponent key={activeId} />
             )}

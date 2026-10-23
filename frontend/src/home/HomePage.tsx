@@ -18,6 +18,7 @@ import { pages, type PageId } from '@/pages'
 
 type HomePageProps = {
   onNavigate: (page: PageId) => void
+  onOpenCve: (cveId: string) => void
 }
 
 // Quick actions card: one button per function of the app.
@@ -30,7 +31,7 @@ const quickActions: { page: PageId; label: string }[] = [
   { page: 'queue', label: 'CVE detail (open one from the queue)' },
 ]
 
-export function HomePage({ onNavigate }: HomePageProps) {
+export function HomePage({ onNavigate, onOpenCve }: HomePageProps) {
   const [ranking, setRanking] = useState<PlannerRanking | null>(null)
   const [error, setError] = useState(false)
 
@@ -92,7 +93,12 @@ export function HomePage({ onNavigate }: HomePageProps) {
                 {topItems.map((item, index) => (
                   <li key={item.cve_id} className="flex flex-col">
                     {index > 0 && <Separator />}
-                    <div className="flex items-center justify-between gap-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => onOpenCve(item.cve_id)}
+                      aria-label={`Open details for ${item.cve_id}`}
+                      className="-mx-2 flex items-center justify-between gap-4 rounded-md px-2 py-3 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <span className="truncate font-mono font-medium">{item.cve_id}</span>
                         <span className="text-sm text-muted-foreground">Risk rank {item.model_rank}</span>
@@ -101,7 +107,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
                         <span className="font-medium tabular-nums">{item.risk_score.toFixed(3)}</span>
                         <Progress value={item.risk_score * 100} aria-label={`Risk score ${item.risk_score.toFixed(3)}`} />
                       </div>
-                    </div>
+                    </button>
                   </li>
                 ))}
               </ul>
