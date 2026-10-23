@@ -11,7 +11,16 @@ import pandas as pd
 from vesper.config import load_settings
 
 OUTPUT_SUBFOLDER = "a_text"  # the table goes in data/processed/a_text/
-COLUMNS = ["cve_id", "published_date", "description", "kev_date_added", "vuln_status"]
+COLUMNS = [
+    "cve_id",
+    "published_date",
+    "description",
+    "kev_date_added",
+    "vuln_status",
+    "cvss_base_score",
+]
+# The CVSS baseline uses the newest CVSS version NVD gives a base score for (v4.0 is not used).
+CVSS_VERSIONS = ("cvssMetricV31", "cvssMetricV30", "cvssMetricV2")
 
 
 def english_description(cve: dict) -> str:
@@ -19,6 +28,17 @@ def english_description(cve: dict) -> str:
     descriptions = cve.get("descriptions") or []
     english = [d for d in descriptions if d.get("lang") == "en"]
     return (english or descriptions or [{}])[0].get("value") or ""
+
+
+def cvss_base_score(cve: dict) -> float | None:
+    """Base score of the first metric listed for the newest CVSS version present, else None."""
+    metrics = cve.get("metrics") or {}
+    for version in CVSS_VERSIONS:
+        for metric in metrics.get(version) or []:
+            score = (metric.get("cvssData") or {}).get("baseScore")
+            if score is not None:
+                return float(score)
+    return None
 
 
 def read_nvd(nvd_dir: Path) -> pd.DataFrame:
@@ -35,11 +55,13 @@ def read_nvd(nvd_dir: Path) -> pd.DataFrame:
                         "last_modified": cve.get("lastModified"),
                         "description": english_description(cve),
                         "vuln_status": cve.get("vulnStatus"),
+                        "cvss_base_score": cvss_base_score(cve),
                     }
                 )
     if not rows:
         raise FileNotFoundError(f"no nvd_*.json.gz files in {nvd_dir}")
     frame = pd.DataFrame(rows)
+    frame["cvss_base_score"] = frame.cvss_base_score.astype(float)  # None -> NaN
     # NVD times carry no zone but are UTC.
     for column in ("published_date", "last_modified"):
         frame[column] = pd.to_datetime(frame[column], utc=True, format="ISO8601")
