@@ -23,7 +23,7 @@ import {
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
-import type { PageId } from '@/pages'
+import { pages, type PageId } from '@/pages'
 
 type HomePageProps = {
   onNavigate: (page: PageId) => void
@@ -70,6 +70,16 @@ const shortcuts: {
     action: 'How scores work',
     icon: ShieldCheck,
   },
+]
+
+// Quick actions card: one button per function of the app.
+const quickActions: { page: PageId; label: string }[] = [
+  { page: 'queue', label: 'Priority queue' },
+  { page: 'sprint', label: 'Sprint plan' },
+  { page: 'analyse', label: 'Analyse a new CVE (A)' },
+  { page: 'timing', label: 'Exploit timing (B)' },
+  { page: 'exposure', label: 'Structural relationships (C)' },
+  { page: 'queue', label: 'CVE detail (open one from the queue)' },
 ]
 
 // Marker colour for each evidence stream (see --stream-* in index.css).
@@ -186,6 +196,24 @@ export function HomePage({ onNavigate }: HomePageProps) {
           </Card>
         ))}
       </section>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick actions</CardTitle>
+          <CardDescription>Jump straight to any part of VESPER.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {quickActions.map(({ page, label }) => {
+            const Icon = pages[page].icon
+            return (
+              <Button key={label} variant="outline" onClick={() => onNavigate(page)}>
+                {Icon && <Icon data-icon="inline-start" />}
+                {label}
+              </Button>
+            )
+          })}
+        </CardContent>
+      </Card>
 
       <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <Card>
