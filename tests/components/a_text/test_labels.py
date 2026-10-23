@@ -45,3 +45,15 @@ def test_unsettled_window_is_excluded():
 def test_published_after_cutoff_or_before_kev_start_is_excluded():
     assert labels("2023-02-01", None) == []
     assert labels("2021-06-01", None) == []
+
+
+def test_time_zone_aware_cutoff_is_converted_to_utc():
+    frame = pd.DataFrame(
+        {
+            "published_date": pd.to_datetime(["2022-10-02", "2022-10-03"], utc=True),
+            "kev_date_added": pd.to_datetime([None, None], utc=True),
+        }
+    )
+    colombo = pd.Timestamp("2023-01-01 05:30", tz="Asia/Colombo")  # same instant as CUTOFF
+    assert build_training_cohort(frame, colombo).equals(build_training_cohort(frame, CUTOFF))
+    assert len(build_training_cohort(frame, colombo)) == 1  # the day-90 boundary still holds

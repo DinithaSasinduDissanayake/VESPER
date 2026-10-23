@@ -1,5 +1,7 @@
 """Remove wording from CVE descriptions that gives away the exploited-or-not label."""
 
+import hashlib
+import json
 import re
 
 # Each group is a list of case-insensitive regex patterns.
@@ -35,7 +37,7 @@ RULES: dict[str, list[str]] = {
     ],
     # Patch notes only appear once a fix and its follow-up attention exist.
     "patch_note": [
-        r"\b(?:fixed|patched|修正|addressed)\s+in\s+(?:version|v?\d)",
+        r"\b(?:fixed|patched|addressed)\s+in\s+(?:version|v?\d)",
         r"\b(?:apply|install)\s+(?:the\s+)?(?:latest\s+)?(?:patch|update)\b",
         r"\bvendor\s+(?:has\s+)?(?:released|provided)\s+(?:a\s+)?(?:patch|fix)\b",
         r"\bupdate\s+to\s+(?:the\s+)?latest\s+version\b",
@@ -45,10 +47,14 @@ RULES: dict[str, list[str]] = {
 _PATTERNS = [re.compile(p, re.IGNORECASE) for group in RULES.values() for p in group]
 
 
-def sanitise_text(text: str | None) -> str:
-    """Delete every leaking phrase from the text and tidy the whitespace."""
-    value = "" if text is None else str(text)
-    spans = [m.span() for pattern in _PATTERNS for m in pattern.finditer(value)]
+def rules_digest() -> str:
+    """Fingerprint of the masking rules; a saved model records the one it was trained with."""
+    return hashlib.sha256(json.dumps(RULES, sort_keys=True).encode()).hexdigest()
+
+
+def leak_spans(text: str) -> list[tuple[int, int]]:
+    """(start, end) of every leaking phrase in the text, without overlaps, left to right."""
+    spans = [m.span() for pattern in _PATTERNS for m in pattern.finditer(text)]
     # Earliest start first; for the same start the longer match wins.
     spans.sort(key=lambda s: (s[0], s[0] - s[1]))
     kept: list[tuple[int, int]] = []
@@ -57,6 +63,12 @@ def sanitise_text(text: str | None) -> str:
         if start >= end:
             kept.append((start, stop))
             end = stop
-    for start, stop in reversed(kept):
+    return kept
+
+
+def sanitise_text(text: str | None) -> str:
+    """Delete every leaking phrase from the text and tidy the whitespace."""
+    value = "" if text is None else str(text)
+    for start, stop in reversed(leak_spans(value)):
         value = value[:start] + " " + value[stop:]
     return re.sub(r"\s+", " ", value).strip()

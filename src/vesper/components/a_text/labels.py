@@ -18,7 +18,8 @@ def build_training_cohort(frame: pd.DataFrame, cutoff) -> pd.DataFrame:
     before `cutoff`, its whole label window ended strictly before `cutoff`, and it
     was not already in KEV at its decision time.
     """
-    cutoff = pd.Timestamp(cutoff, tz="UTC")
+    cutoff = pd.Timestamp(cutoff)
+    cutoff = cutoff.tz_localize("UTC") if cutoff.tzinfo is None else cutoff.tz_convert("UTC")
     decision = frame.published_date + pd.Timedelta(days=DECISION_DAYS)
     window_end = decision + pd.Timedelta(days=HORIZON_DAYS)
 

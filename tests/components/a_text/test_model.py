@@ -47,3 +47,22 @@ def test_too_few_positives_rejected():
 
 def test_missing_description_is_empty():
     assert m.clean_texts([None, float("nan")]) == ["", ""]
+
+
+def test_bare_string_is_rejected():
+    with pytest.raises(TypeError, match="list of texts"):
+        m.clean_texts("remote code execution in the parser")
+
+
+def test_held_out_log_odds_cover_every_sampled_row(monkeypatch):
+    monkeypatch.setattr(m, "MAX_NEGATIVES", 30)
+    held = m.held_out_log_odds(toy_frame())
+    assert held.shape == (45,) and np.isfinite(held).all()
+    sampled, _ = m.sample_training(toy_frame())
+    is_pos = sampled.label.to_numpy() == 1
+    assert held[is_pos].mean() > held[~is_pos].mean()
+
+
+def test_ranking_reference_is_median_and_iqr_with_a_floor():
+    assert m.ranking_reference(np.arange(101.0)) == {"ranking_centre": 50.0, "ranking_scale": 50.0}
+    assert m.ranking_reference([0.0, 0.0, 0.1, 0.2])["ranking_scale"] == m.MIN_RANKING_SCALE

@@ -10,7 +10,8 @@ import pandas as pd
 import sklearn
 
 from vesper.components.a_text.labels import DECISION_DAYS, HORIZON_DAYS, build_training_cohort
-from vesper.components.a_text.model import fit_text_model
+from vesper.components.a_text.model import fit_text_model, held_out_log_odds, ranking_reference
+from vesper.components.a_text.sanitise import rules_digest
 from vesper.config import load_settings
 
 COLUMNS = ["published_date", "description", "kev_date_added"]  # read from the CVE table
@@ -24,6 +25,9 @@ def train(data: Path, cutoff: date, out: Path) -> dict:
     frame["kev_date_added"] = pd.to_datetime(frame.kev_date_added, utc=True)
     cohort = build_training_cohort(frame, cutoff)
     model = fit_text_model(cohort)
+    # Three more fits, each without one third of the rows, give unseen scores to set the
+    # centre and spread of the ranking score.
+    reference = ranking_reference(held_out_log_odds(cohort))
     metadata = {
         "cutoff": cutoff.isoformat(),
         "horizon_days": HORIZON_DAYS,
@@ -32,6 +36,8 @@ def train(data: Path, cutoff: date, out: Path) -> dict:
         "n_positives": int(cohort.label.sum()),
         "best_c": model.best_c,
         "offset": model.offset,
+        **reference,
+        "sanitiser_digest": rules_digest(),  # load_model refuses the file if the rules change
         "sklearn_version": sklearn.__version__,
         "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }

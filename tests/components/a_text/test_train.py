@@ -2,6 +2,7 @@ import joblib
 import pandas as pd
 
 from vesper.components.a_text import train
+from vesper.components.a_text.sanitise import rules_digest
 from vesper.config import load_settings
 
 
@@ -32,5 +33,7 @@ def test_cli_saves_a_model_that_loads_and_scores(tmp_path, monkeypatch):
     assert saved["metadata"]["n_train"] == n
     assert saved["metadata"]["n_positives"] == 15
     assert saved["metadata"]["cutoff"] == "2022-12-01"
+    assert saved["metadata"]["ranking_scale"] >= 1.0
+    assert saved["metadata"]["sanitiser_digest"] == rules_digest()
     p = saved["model"].predict_proba(["remote code execution in parser", "minor display glitch"])
     assert p[0] > p[1]
