@@ -3,7 +3,13 @@ import json
 
 import pandas as pd
 
-from vesper.components.a_text.dataset import COLUMNS, build, english_description, main
+from vesper.components.a_text.dataset import (
+    COLUMNS,
+    build,
+    cvss_base_score,
+    english_description,
+    main,
+)
 
 
 def cve(cve_id, published, modified, descriptions, status="Analyzed"):
@@ -107,3 +113,14 @@ def test_main_cli(tmp_path, capsys):
     main(["--nvd", str(nvd), "--kev", str(kev), "--out", str(out)])
     assert "3 CVEs, 1 in KEV" in capsys.readouterr().out
     assert len(pd.read_parquet(out)) == 3
+
+
+def test_cvss_base_score_prefers_the_newest_version():
+    def metric(score):
+        return [{"cvssData": {"baseScore": score}}]
+
+    v2, v30, v31 = metric(5.0), metric(7.5), metric(9.8)
+    assert cvss_base_score({"metrics": {"cvssMetricV2": v2, "cvssMetricV31": v31}}) == 9.8
+    assert cvss_base_score({"metrics": {"cvssMetricV2": v2, "cvssMetricV30": v30}}) == 7.5
+    assert cvss_base_score({"metrics": {"cvssMetricV2": v2, "cvssMetricV40": metric(1.0)}}) == 5.0
+    assert cvss_base_score({}) is None
