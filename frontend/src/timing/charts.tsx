@@ -21,16 +21,20 @@ type LineChartProps = {
   title: string
   // Shown above the plot when the y-axis does not start at 0
   zoomNote?: string
+  // Optional second line, drawn dashed, with a legend (same x values as points)
+  compare?: { points: [x: number, y: number][]; label: string; mainLabel: string }
 }
 
-export function LineChart({ points, xLabel, yLabel, yDomain, formatY, title, zoomNote }: LineChartProps) {
+export function LineChart({ points, xLabel, yLabel, yDomain, formatY, title, zoomNote, compare }: LineChartProps) {
   if (points.length < 2) return null
   const xMin = points[0][0]
   const xMax = points[points.length - 1][0]
   const [yMin, yMax] = yDomain
   const x = (value: number) => PAD.left + ((value - xMin) / (xMax - xMin || 1)) * PLOT_W
   const y = (value: number) => PAD.top + (1 - (value - yMin) / (yMax - yMin || 1)) * PLOT_H
-  const path = points.map(([px, py], i) => `${i ? 'L' : 'M'}${x(px).toFixed(1)},${y(py).toFixed(1)}`).join(' ')
+  const toPath = (line: [number, number][]) =>
+    line.map(([px, py], i) => `${i ? 'L' : 'M'}${x(px).toFixed(1)},${y(py).toFixed(1)}`).join(' ')
+  const path = toPath(points)
 
   return (
     <figure className="flex flex-col gap-1">
@@ -64,6 +68,9 @@ export function LineChart({ points, xLabel, yLabel, yDomain, formatY, title, zoo
           y2={HEIGHT - PAD.bottom}
           className="stroke-muted-foreground"
         />
+        {compare && (
+          <path d={toPath(compare.points)} fill="none" strokeWidth={2} strokeDasharray="5 4" className="stroke-muted-foreground" />
+        )}
         <path d={path} fill="none" strokeWidth={2} className="stroke-foreground" />
         <text x={PAD.left + PLOT_W / 2} y={HEIGHT - 6} textAnchor="middle" className="fill-foreground text-[13px]">
           {xLabel}
@@ -76,6 +83,12 @@ export function LineChart({ points, xLabel, yLabel, yDomain, formatY, title, zoo
           {yLabel}
         </text>
       </svg>
+      {compare && (
+        <figcaption className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+          <span>━ {compare.mainLabel}</span>
+          <span>╌ {compare.label}</span>
+        </figcaption>
+      )}
     </figure>
   )
 }

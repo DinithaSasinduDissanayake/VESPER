@@ -8,8 +8,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from vesper.api import a_text
+from vesper.api import a_text, b_survival
 from vesper.api.a_text import router as a_text_router
+from vesper.api.b_survival import router as b_survival_router
 from vesper.api.c_graph import router as c_graph_router
 from vesper.api.knapsack import router as knapsack_router
 
@@ -17,6 +18,7 @@ from vesper.api.knapsack import router as knapsack_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     a_text.warm_up()  # load the A model in the background; startup does not wait
+    b_survival.warm_up()  # fit the B model in the background (about 15 s)
     yield
 
 
@@ -25,6 +27,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)  # the ranking JSON is lar
 app.include_router(knapsack_router)
 app.include_router(c_graph_router)
 app.include_router(a_text_router)
+app.include_router(b_survival_router)
 
 
 @app.exception_handler(RequestValidationError)
