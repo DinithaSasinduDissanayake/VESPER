@@ -107,60 +107,63 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const topItems = ranking?.vulnerabilities.slice(0, 3) ?? []
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <section className="grid gap-6 py-2 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
-        <div className="flex flex-col items-start gap-4">
-          <Badge variant="secondary">
-            <ShieldCheck data-icon="inline-start" />
-            Evidence led vulnerability prioritization
-          </Badge>
-          <h2 className="max-w-2xl text-4xl font-semibold tracking-tight text-balance md:text-5xl">
-            Turn vulnerability signals into a patch plan.
-          </h2>
-          <p className="max-w-2xl text-lg text-pretty text-muted-foreground">
-            Review the current risk ranking, then allocate team capacity to build a practical daily, weekly, or monthly patch schedule.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="lg" onClick={() => onNavigate('queue')}>
-              View priority queue <ArrowRight data-icon="inline-end" />
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => onNavigate('sprint')}>
-              Build a patch plan <CalendarClock data-icon="inline-end" />
-            </Button>
+    <div className="mx-auto max-w-7xl space-y-7">
+      <section className="relative isolate overflow-hidden rounded-3xl bg-gradient-to-br from-[#071b39] via-[#0b3977] to-[#1269a8] px-6 py-8 text-white shadow-xl shadow-blue-950/15 md:px-10 md:py-11">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-36 -z-10 size-[30rem] rounded-full border border-white/10" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-20 -z-10 size-[22rem] rounded-full border border-white/10" />
+        <div aria-hidden="true" className="pointer-events-none absolute right-24 top-10 -z-10 size-48 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="relative grid gap-8 md:grid-cols-[1.35fr_0.65fr] md:items-end">
+          <div>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-blue-100 backdrop-blur">
+              <ShieldCheck className="size-4 text-cyan-200" />
+              Evidence led vulnerability prioritization
+            </div>
+            <h2 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight md:text-5xl">
+              Turn vulnerability signals into a patch plan.
+            </h2>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-blue-100/85 md:text-base">
+              Review the current risk ranking, then allocate team capacity to build a practical daily, weekly, or monthly patch schedule.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Button onClick={() => onNavigate('queue')} className="h-10 bg-white px-4 font-semibold text-blue-950 shadow-md hover:bg-blue-50">
+                View priority queue <ArrowRight />
+              </Button>
+              <Button onClick={() => onNavigate('sprint')} variant="outline" className="h-10 border-white/30 bg-white/10 px-4 text-white hover:bg-white/15 hover:text-white">
+                Build a patch plan <CalendarClock />
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <Card>
-          <CardHeader>
-            <CardDescription className="flex items-center gap-2">
-              <Database className="size-4" />
-              Current ranking feed
-            </CardDescription>
-            <CardAction>
-              <Badge variant="outline">Provisional</Badge>
-            </CardAction>
-            <CardTitle className="flex items-baseline gap-2">
-              <span className="text-3xl font-semibold tabular-nums tracking-tight">
+          <div className="rounded-2xl border border-white/15 bg-white/10 p-5 shadow-inner backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-50">
+                <Database className="size-4 text-cyan-200" />
+                Current ranking feed
+              </div>
+              <span className="rounded-full border border-amber-200/25 bg-amber-300/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-100">
+                Provisional
+              </span>
+            </div>
+            <div className="mt-6 flex items-end gap-3">
+              <span className="text-4xl font-semibold tabular-nums tracking-tight">
                 {ranking ? ranking.count.toLocaleString() : '—'}
               </span>
-              <span className="text-sm font-normal text-muted-foreground">ranked CVEs</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 text-muted-foreground">
-            <p>
+              <span className="pb-1 text-sm text-blue-100/75">ranked CVEs</span>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-blue-100/70">
               {ranking
                 ? `Composite ranking${ranking.vulnerabilities[0]?.data_as_of ? ` · data as of ${ranking.vulnerabilities[0].data_as_of}` : ''}`
                 : error
                   ? 'Ranking feed unavailable. Start the API and verify the ranking file.'
                   : 'Checking ranking feed…'}
             </p>
-            <Separator />
-            <p className="flex items-start gap-2">
-              <CircleAlert className="mt-0.5 size-4 shrink-0" />
+            <div className="mt-5 h-px bg-white/15" />
+            <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-blue-100/75">
+              <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-200" />
               This is an equal-weight provisional composite, not a trained or validated predictive model.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
