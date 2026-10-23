@@ -37,6 +37,16 @@ export type StructuralDetails = {
     referenceTime: string
     graphScope: string
     evidenceStatus: string
+    snapshotId?: string
+    providerModelVersion?: string
+    featureSchemaVersion?: string
+    sourcePublishedAt?: string
+    sourceModifiedAt?: string
+    sourceFile?: string
+    providerSha256?: string
+    scoresSha256?: string
+    analysisSha256?: string | null
+    featureProvenance?: string
   }
 }
 
