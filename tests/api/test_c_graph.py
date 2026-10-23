@@ -225,7 +225,7 @@ def test_unknown_cve_and_invalid_identifier(client, artifacts):
 
 
 def test_optional_analysis_does_not_fabricate_degree_or_comparison(client, artifacts, monkeypatch):
-    monkeypatch.delenv("VESPER_C_DISAGREEMENT_CSV")
+    monkeypatch.setenv("VESPER_C_DISAGREEMENT_CSV", "")
     data = client.get("/api/c-graph/cves/CVE-2024-0001").json()
     assert data["structural_score"] == 0.97
     assert data["degree"] is None
