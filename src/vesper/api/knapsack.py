@@ -365,8 +365,8 @@ def get_cve_detail(cve_id: CveId) -> VulnerabilityFacts:
         cwe_ids=[str(value) for value in _as_list(row["cwe_ids"])],
         affected=[
             (str(pair[0]), str(pair[1]))
-            for pair in _as_list(row["affected"])
-            if isinstance(pair, (list, tuple)) and len(pair) >= 2
+            for pair in map(_as_list, _as_list(row["affected"]))
+            if len(pair) >= 2
         ],
         nvd_status=str(row["nvd_status"] or ""),
         snapshot_date=_as_iso(row["snapshot_date"]),

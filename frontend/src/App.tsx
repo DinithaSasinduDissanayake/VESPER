@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentType } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { AnalysePage } from '@/analyse/AnalysePage'
 import { warmUpTextModel } from '@/api/aText'
+import { PageErrorBoundary } from '@/components/PageErrorBoundary'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { mainNav, pages, type PageId } from '@/pages'
@@ -80,7 +81,9 @@ function App() {
 
   return (
     <div className="flex min-h-svh flex-col bg-surface md:flex-row">
-      <aside className="flex w-full shrink-0 flex-col border-b bg-sidebar text-sidebar-foreground md:sticky md:top-0 md:h-svh md:w-64 md:border-r md:border-b-0">
+      {/* The wrapper stretches to the page height so the sidebar colour does not stop at the first screen. */}
+      <div className="w-full shrink-0 border-b bg-sidebar md:w-64 md:border-r md:border-b-0">
+      <aside className="flex w-full flex-col text-sidebar-foreground md:sticky md:top-0 md:h-svh">
         <button
           type="button"
           onClick={() => goTo('home')}
@@ -110,6 +113,7 @@ function App() {
           />
         </nav>
       </aside>
+      </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur sm:px-6">
@@ -123,11 +127,13 @@ function App() {
 
         {/* key resets the page's state (e.g. the open CVE) when the page changes. */}
         <main className="min-w-0 flex-1 p-4 text-base sm:p-6 lg:p-8">
-          {activeId === 'home' ? (
-            <HomePage key={activeId} onNavigate={goTo} />
-          ) : (
-            PageComponent && <PageComponent key={activeId} />
-          )}
+          <PageErrorBoundary key={activeId}>
+            {activeId === 'home' ? (
+              <HomePage key={activeId} onNavigate={goTo} />
+            ) : (
+              PageComponent && <PageComponent key={activeId} />
+            )}
+          </PageErrorBoundary>
         </main>
       </div>
     </div>
