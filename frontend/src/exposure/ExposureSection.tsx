@@ -39,6 +39,12 @@ function RelationshipEvidence({ data }: { data: StructuralDetails }) {
   )
 }
 
+// The C API answers 503 with this text when its artifacts are not configured here;
+// that is a setup gap, not a failure, so show a calm note without env-var names.
+function artifactsMissing(message: string) {
+  return message.startsWith('Component C artifacts unavailable')
+}
+
 export function ExposureSection({ resource, item }: { resource?: StructuralDetailsState; item?: QueueItem }) {
   const id = useId()
   if (!resource && item) {
@@ -56,7 +62,9 @@ export function ExposureSection({ resource, item }: { resource?: StructuralDetai
       </CardHeader>
       <CardContent className="min-w-0 space-y-5">
         {resource.state === 'loading' && <p role="status" className="rounded-xl border border-dashed p-8 text-muted-foreground">Loading structural relationships…</p>}
-        {resource.state === 'error' && <div role="alert" className="rounded-xl border p-6"><p className="font-medium">Structural relationships could not be loaded</p><p className="mt-2 text-sm text-muted-foreground">{resource.message}</p></div>}
+        {resource.state === 'error' && (artifactsMissing(resource.message)
+          ? <p role="status" className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">Structural details not loaded on this machine. Any structural score shown elsewhere comes from the ranking file.</p>
+          : <div role="alert" className="rounded-xl border p-6"><p className="font-medium">Structural relationships could not be loaded</p><p className="mt-2 text-sm text-muted-foreground">{resource.message}</p></div>)}
         {resource.state === 'loaded' && <>
           {resource.data.dataSource === 'sample' && <p className="rounded-lg border border-dashed px-3 py-2 text-sm leading-relaxed text-muted-foreground">Illustrative UI fixtures only. All scores, relationships and provenance shown here are sample data, including when the selected CVE ID is real. They are not validated research results.</p>}
           <StructuralSummary data={resource.data} />

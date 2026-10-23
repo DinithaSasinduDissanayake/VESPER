@@ -86,3 +86,11 @@ test('queue detail fixtures keep the selected CVE and score state', () => {
     assert.equal(resource.data.structuralScore.status, score?.status ?? 'unavailable')
   }
 })
+
+test('missing C artifacts show a calm note without configuration jargon', () => {
+  const message = 'Component C artifacts unavailable. Configure VESPER_C_FEATURE_PROVIDER_CSV, VESPER_C_SCORES_CSV and their metadata sidecars; disagreement CSV is optional.'
+  const html = render(ExposureSection, { resource: { state: 'error', message } })
+  assert.ok(html.includes('Structural details not loaded on this machine'))
+  assert.ok(!html.includes('VESPER_C_'))
+  assert.ok(!html.includes('role="alert"'))
+})
