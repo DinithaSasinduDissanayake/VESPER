@@ -159,7 +159,7 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
           </CardContent>
         </Card>
 
-        <div className="min-w-0 lg:col-span-2">
+        <div className="min-w-0 empty:hidden lg:col-span-2">
           <TimingSection item={timingItem(facts, candidate)} />
         </div>
       </div>
