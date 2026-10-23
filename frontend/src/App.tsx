@@ -1,5 +1,4 @@
 import { useEffect, useState, type ComponentType } from 'react'
-import { ShieldCheck } from 'lucide-react'
 import { AnalysePage } from '@/analyse/AnalysePage'
 import { warmUpTextModel } from '@/api/aText'
 import { PageErrorBoundary } from '@/components/PageErrorBoundary'
@@ -98,8 +97,8 @@ function App() {
           onClick={() => goTo('home')}
           className="flex items-center gap-3 px-4 py-5 text-left outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
         >
-          <span className="grid size-9 place-items-center rounded-xl bg-linear-135 from-primary to-stream-ranking text-primary-foreground shadow-sm ring-1 ring-primary/20">
-            <ShieldCheck className="size-5" />
+          <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-base font-bold text-primary-foreground">
+            V
           </span>
           <span className="flex flex-col">
             <span className="text-base font-semibold tracking-tight">VESPER</span>
