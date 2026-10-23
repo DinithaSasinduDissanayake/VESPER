@@ -42,12 +42,12 @@ function UrgentTable({ data }: { data: TimingData }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-right">#</TableHead>
+              <TableHead className="w-10 text-right">#</TableHead>
               <TableHead>Level</TableHead>
               <TableHead>Vulnerability</TableHead>
               <TableHead>Software</TableHead>
               <TableHead>Published</TableHead>
-              <TableHead className="text-right">30-day chance</TableHead>
+              <TableHead className="text-right whitespace-normal">30-day chance</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -66,8 +66,8 @@ function UrgentTable({ data }: { data: TimingData }) {
                       <LevelBadge level={detail.level} status={detail.status} />
                     </TableCell>
                     <TableCell className="font-mono">{id}</TableCell>
-                    <TableCell className="max-w-64 truncate" title={whatItIs(detail)}>
-                      {whatItIs(detail)}
+                    <TableCell className="w-full max-w-0 whitespace-normal" title={whatItIs(detail)}>
+                      <span className="line-clamp-2 break-words">{whatItIs(detail)}</span>
                     </TableCell>
                     <TableCell>{detail.published}</TableCell>
                     <TableCell className="text-right font-medium">{chanceText(detail.raw_30d)}</TableCell>
@@ -147,7 +147,7 @@ function UrgentTab({ data }: { data: TimingData }) {
         {data.levels.counts.High.toLocaleString()}), <strong className="text-foreground">Medium</strong> = next 15%,{' '}
         <strong className="text-foreground">Low</strong> = the rest. The 30-day chance is an estimate for ranking.
       </p>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_20rem]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_17rem] 2xl:grid-cols-[minmax(0,1fr)_20rem]">
         <UrgentTable data={data} />
         <AlreadyAttacked data={data} />
       </div>
