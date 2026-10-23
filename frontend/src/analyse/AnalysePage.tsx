@@ -115,7 +115,7 @@ export function AnalysePage() {
   const loading = state.kind === 'loading'
 
   return (
-    <div className="flex max-w-6xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <Card>
         <CardHeader>
           <CardTitle>Paste a vulnerability description</CardTitle>
