@@ -33,6 +33,16 @@ function displayScore(value: number | null, digits = 3) {
   return value === null ? 'Unavailable' : value.toFixed(digits)
 }
 
+// NVD text often carries hard line breaks and runs of blank lines; keep paragraph
+// breaks but collapse the rest so the card has no large empty gaps.
+function descriptionParagraphs(description: string) {
+  const paragraphs = description
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  return paragraphs.length ? paragraphs : ['No description is recorded in the local NVD snapshot.']
+}
+
 function formatDate(value: string) {
   const parsed = new Date(value)
   return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleString()
@@ -71,7 +81,9 @@ function FactsView({ facts, candidate }: { facts: VulnerabilityFacts; candidate:
           <CardTitle>Description</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-start gap-2">
-          <p className="max-w-[80ch] text-base leading-7 whitespace-pre-wrap">{facts.description || 'No description is recorded in the local NVD snapshot.'}</p>
+          {descriptionParagraphs(facts.description).map((paragraph, index) => (
+            <p key={index} className="max-w-[80ch] text-base leading-7">{paragraph}</p>
+          ))}
           <Button variant="link" className="px-0" asChild>
             <a
               href={`https://nvd.nist.gov/vuln/detail/${encodeURIComponent(facts.cve_id)}`}
