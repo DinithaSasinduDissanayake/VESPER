@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
-import { ArrowDownToLine } from 'lucide-react'
+import { ArrowDownToLine, CircleAlert } from 'lucide-react'
 import {
   downloadPlannerRanking,
   getPlannerRanking,
   type PlannerCandidate,
   type PlannerRanking,
 } from '@/api/queue'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { CveDetail } from './CveDetail'
 import {
   Table,
@@ -34,39 +37,35 @@ function saveCsv(blob: Blob, filename: string) {
 
 function RankingRows({ candidates, onSelect }: { candidates: PlannerCandidate[]; onSelect: (cveId: string) => void }) {
   return (
-    <Table>
+    <Table className="[&_td]:py-2.5 [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
       <TableHeader>
         <TableRow>
-          <TableHead className="bg-blue-50/80 font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Rank</TableHead>
-          <TableHead className="bg-blue-50/80 font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">CVE</TableHead>
-          <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Risk score</TableHead>
-          <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Text (A)</TableHead>
-          <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Timing (B)</TableHead>
-          <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Exposure (C)</TableHead>
-          <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">CVSS</TableHead>
-          <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">EPSS</TableHead>
-          <TableHead className="bg-blue-50/80 text-right font-semibold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">Signals</TableHead>
+          <TableHead>Rank</TableHead>
+          <TableHead>CVE</TableHead>
+          <TableHead className="text-right">Risk score</TableHead>
+          <TableHead className="text-right">Text (A)</TableHead>
+          <TableHead className="text-right">Timing (B)</TableHead>
+          <TableHead className="text-right">Structural signal (C)</TableHead>
+          <TableHead className="text-right">CVSS</TableHead>
+          <TableHead className="text-right">EPSS</TableHead>
+          <TableHead className="text-right">Signals</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {candidates.map((candidate) => (
-          <TableRow key={candidate.cve_id} className="transition-colors hover:bg-blue-50/70 dark:hover:bg-blue-950/30">
-            <TableCell>
-              <span className="inline-flex min-w-8 justify-center rounded-md bg-blue-50 px-2 py-1 text-xs font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-200">
-                {candidate.model_rank}
-              </span>
-            </TableCell>
+          <TableRow key={candidate.cve_id}>
+            <TableCell className="tabular-nums text-muted-foreground">{candidate.model_rank}</TableCell>
             <TableCell>
               <button
                 type="button"
-                className="font-mono font-medium text-blue-800 underline-offset-4 hover:text-blue-600 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-blue-200 dark:hover:text-blue-100"
+                className="rounded-sm font-mono font-medium underline decoration-muted-foreground/40 underline-offset-4 outline-none hover:decoration-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
                 onClick={() => onSelect(candidate.cve_id)}
                 aria-label={`Open details for ${candidate.cve_id}`}
               >
                 {candidate.cve_id}
               </button>
             </TableCell>
-            <TableCell className="text-right font-semibold tabular-nums text-blue-950 dark:text-blue-100">{score(candidate.risk_score)}</TableCell>
+            <TableCell className="text-right font-medium tabular-nums">{score(candidate.risk_score)}</TableCell>
             <TableCell className="text-right">{score(candidate.score_a)}</TableCell>
             <TableCell className="text-right">{score(candidate.score_b)}</TableCell>
             <TableCell className="text-right" title={candidate.reason_c ?? undefined}>
@@ -131,22 +130,18 @@ export function QueuePage() {
   }
 
   return (
-    <section className="space-y-5">
-      <div className="queue-hero-pattern relative isolate flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-2xl border border-blue-900/20 p-5 text-white shadow-lg shadow-blue-950/10 md:p-6">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-24 z-0 size-72 rounded-full border border-white/10" />
-        <div aria-hidden="true" className="pointer-events-none absolute -right-2 -top-14 z-0 size-52 rounded-full border border-white/10" />
-        <div className="relative z-10">
-          <div className="mb-2 flex items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight text-white">Top prioritized vulnerabilities</h2>
-            <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-100 backdrop-blur">
-              Provisional
-            </span>
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-semibold tracking-tight">Top prioritized vulnerabilities</h2>
+            <Badge variant="outline">Provisional</Badge>
           </div>
-          <p className="text-sm text-blue-100/85">
+          <p className="text-muted-foreground">
             Five-signal composite ranking; this is not a trained or validated model.
           </p>
           {ranking && (
-            <p className="mt-1.5 text-xs font-medium text-sky-200">
+            <p className="text-sm text-muted-foreground">
               Showing top {topCandidates.length} of {ranking.count.toLocaleString()} CVEs
               {ranking.vulnerabilities[0]?.data_as_of
                 ? ` · data as of ${ranking.vulnerabilities[0].data_as_of}`
@@ -154,8 +149,8 @@ export function QueuePage() {
             </p>
           )}
         </div>
-        <Button onClick={handleDownload} disabled={loading || downloading || !ranking} className="relative z-10 border border-white/25 bg-white text-blue-900 shadow-md hover:bg-blue-50">
-          <ArrowDownToLine />
+        <Button variant="outline" onClick={handleDownload} disabled={loading || downloading || !ranking}>
+          <ArrowDownToLine data-icon="inline-start" />
           {downloading ? 'Preparing CSV…' : 'Download full ranking CSV'}
         </Button>
       </div>
@@ -163,18 +158,19 @@ export function QueuePage() {
       {loading ? (
         <p role="status" className="text-muted-foreground">Loading current ranking…</p>
       ) : error ? (
-        <div role="alert" className="space-y-2 rounded-md border border-destructive/40 p-4">
-          <p className="font-medium">Could not load the current ranking: {error}</p>
-          <p className="text-sm text-muted-foreground">
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Could not load the current ranking: {error}</AlertTitle>
+          <AlertDescription>
             Confirm the API is running and the current ranking CSV has been generated.
-          </p>
-        </div>
+          </AlertDescription>
+        </Alert>
       ) : topCandidates.length === 0 ? (
         <p className="text-muted-foreground">The ranking is available but contains no CVEs.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+        <Card className="py-0">
           <RankingRows candidates={topCandidates} onSelect={setSelectedCveId} />
-        </div>
+        </Card>
       )}
     </section>
   )
