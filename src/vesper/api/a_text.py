@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -13,6 +14,7 @@ from vesper.config import load_settings
 router = APIRouter(prefix="/api/a-text", tags=["Component A"])
 DEFAULT_CUTOFF = "2026-10-01"  # the model the demo is trained at; override with VESPER_A_MODEL
 _loaded: dict[Path, dict] = {}  # one loaded model per path; failures are not cached
+_load_lock = threading.Lock()  # a request waits for a load already in progress
 
 
 class ScoreRequest(BaseModel):
@@ -35,6 +37,11 @@ def _get_model() -> dict:
     path = _model_path()
     if path in _loaded:
         return _loaded[path]
+    with _load_lock:
+        return _loaded[path] if path in _loaded else _load(path)
+
+
+def _load(path: Path) -> dict:
     if not path.is_file():
         raise HTTPException(
             status_code=503,
@@ -51,6 +58,23 @@ def _get_model() -> dict:
     except ValueError as error:  # e.g. masking rules changed since training: retrain
         raise HTTPException(status_code=503, detail=str(error)) from error
     return _loaded[path]
+
+
+def warm_up() -> threading.Thread:
+    """Start loading the model in the background so the first request is fast.
+
+    A failure is ignored here; the next request retries and returns the 503.
+    """
+
+    def load_quietly():
+        try:
+            _get_model()
+        except Exception:  # noqa: BLE001
+            pass
+
+    thread = threading.Thread(target=load_quietly, name="a-text-warm-up", daemon=True)
+    thread.start()
+    return thread
 
 
 @router.post("/score")

@@ -85,3 +85,28 @@ def test_changed_masking_rules_is_503(client):
     response = test_client.get("/api/a-text/model")
     assert response.status_code == 503
     assert "masking rules changed" in response.json()["detail"]
+
+
+def test_warm_up_loads_in_background(client):
+    _, _, model_file = client
+    a_text.warm_up().join(timeout=5)
+    assert model_file in a_text._loaded
+
+
+def test_failed_warm_up_retries_on_request(client):
+    test_client, fake, model_file = client
+    model_file.unlink()
+    a_text.warm_up().join(timeout=5)  # no exception escapes the thread
+    assert a_text._loaded == {}
+    assert test_client.get("/api/a-text/model").status_code == 503
+    model_file.write_bytes(b"fake")
+    assert test_client.get("/api/a-text/model").status_code == 200
+
+
+def test_startup_starts_the_warm_up(client, monkeypatch):
+    test_client, _, _ = client
+    started = []
+    monkeypatch.setattr(a_text, "warm_up", lambda: started.append(True))
+    with test_client:  # runs the app's lifespan
+        pass
+    assert started == [True]
