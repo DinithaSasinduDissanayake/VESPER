@@ -42,12 +42,12 @@ function UrgentTable({ data }: { data: TimingData }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-right">#</TableHead>
+              <TableHead className="w-10 text-right">#</TableHead>
               <TableHead>Level</TableHead>
               <TableHead>Vulnerability</TableHead>
               <TableHead>Software</TableHead>
               <TableHead>Published</TableHead>
-              <TableHead className="text-right">30-day chance</TableHead>
+              <TableHead className="text-right whitespace-normal">30-day chance</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -66,8 +66,8 @@ function UrgentTable({ data }: { data: TimingData }) {
                       <LevelBadge level={detail.level} status={detail.status} />
                     </TableCell>
                     <TableCell className="font-mono">{id}</TableCell>
-                    <TableCell className="max-w-64 truncate" title={whatItIs(detail)}>
-                      {whatItIs(detail)}
+                    <TableCell className="w-full max-w-0 whitespace-normal" title={whatItIs(detail)}>
+                      <span className="line-clamp-2 break-words">{whatItIs(detail)}</span>
                     </TableCell>
                     <TableCell>{detail.published}</TableCell>
                     <TableCell className="text-right font-medium">{chanceText(detail.raw_30d)}</TableCell>
@@ -82,9 +82,9 @@ function UrgentTable({ data }: { data: TimingData }) {
                             href={detail.nvd_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 self-start text-xs underline"
+                            className="inline-flex items-center gap-1 self-start text-sm underline"
                           >
-                            Read the full advisory on NVD <ExternalLink className="size-3" />
+                            Read the full advisory on NVD <ExternalLink className="size-3.5" />
                           </a>
                         </div>
                       </TableCell>
@@ -95,7 +95,7 @@ function UrgentTable({ data }: { data: TimingData }) {
             })}
           </TableBody>
         </Table>
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
           Vulnerabilities with the same score share the same number.
         </p>
       </CardContent>
@@ -124,12 +124,12 @@ function AlreadyAttacked({ data }: { data: TimingData }) {
                 {item.cve_id}
               </a>
               <span>{[item.vendor, item.product].filter(Boolean).join(' ') || item.name}</span>
-              <span className="text-xs text-muted-foreground">Added {item.date_added}</span>
+              <span className="text-sm text-muted-foreground">Added {item.date_added}</span>
             </li>
           ))}
         </ul>
         {recent.count > recent.items.length && (
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Showing the newest {recent.items.length} of {recent.count}.
           </p>
         )}
@@ -147,7 +147,7 @@ function UrgentTab({ data }: { data: TimingData }) {
         {data.levels.counts.High.toLocaleString()}), <strong className="text-foreground">Medium</strong> = next 15%,{' '}
         <strong className="text-foreground">Low</strong> = the rest. The 30-day chance is an estimate for ranking.
       </p>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_20rem]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_17rem] 2xl:grid-cols-[minmax(0,1fr)_20rem]">
         <UrgentTable data={data} />
         <AlreadyAttacked data={data} />
       </div>
@@ -175,21 +175,21 @@ function BigResult({ data }: { data: TimingData }) {
         <div>
           <p className="text-muted-foreground">Our model (C-index)</p>
           <p className="text-2xl font-semibold">{cox.c_index.toFixed(3)}</p>
-          <p className="text-xs text-muted-foreground">95% CI {ci(cox.c_index_ci)}</p>
+          <p className="text-sm text-muted-foreground">95% CI {ci(cox.c_index_ci)}</p>
         </div>
         <div>
           <p className="text-muted-foreground">CVSS alone (C-index)</p>
           <p className="text-2xl font-semibold">{cvss.c_index.toFixed(3)}</p>
-          <p className="text-xs text-muted-foreground">95% CI {ci(cvss.c_index_ci)}</p>
+          <p className="text-sm text-muted-foreground">95% CI {ci(cvss.c_index_ci)}</p>
         </div>
         <div>
           <p className="text-muted-foreground">Difference</p>
           <p className="text-2xl font-semibold">{signed(difference.difference)}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             95% CI {ci(difference.ci)} ({difference.excludes_zero ? 'excludes 0' : 'includes 0'})
           </p>
         </div>
-        <p className="text-xs text-muted-foreground sm:col-span-3">
+        <p className="text-sm text-muted-foreground sm:col-span-3">
           C-index = how often the model puts the vulnerability that was attacked first above another one (0.5 =
           guessing, 1 = perfect). Trained on data before {data.results.main_cutoff} ({cox.train_events} KEV
           listings), tested on the next 365 days ({cox.test_events} listings), same 1,000 resamples for both.
@@ -277,7 +277,7 @@ function Backtest({ data }: { data: TimingData }) {
             ))}
           </TableBody>
         </Table>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {summary.rank_note} One month and {summary.scored} vulnerabilities: an example, not proof.
         </p>
       </CardContent>
@@ -394,7 +394,7 @@ function ProofTab({ data }: { data: TimingData }) {
       <Curves data={data} />
       <HazardRatios data={data} />
       <Limitations data={data} />
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Model {data.meta.model_version} · data snapshot {data.meta.snapshot_date} · generated{' '}
         {day(data.meta.generated_at)}
       </p>

@@ -17,7 +17,7 @@ export function MissingDataCard({ message }: { message: string }) {
       <CardContent className="flex flex-col gap-2">
         <p className="text-muted-foreground">{message}</p>
         <p>
-          Run: <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">{REGENERATE_COMMAND}</code>
+          Run: <code className="rounded bg-muted px-1 py-0.5 font-mono text-sm">{REGENERATE_COMMAND}</code>
         </p>
       </CardContent>
     </Card>
@@ -50,7 +50,7 @@ export function TimingSection({ item }: { item: QueueItem }) {
           )}
         </div>
         <Reasons detail={detail} />
-        <p className="text-xs text-muted-foreground">As of {day(detail.decision_time)}.</p>
+        <p className="text-sm text-muted-foreground">As of {day(detail.decision_time)}.</p>
       </CardContent>
     </Card>
   )

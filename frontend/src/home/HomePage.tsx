@@ -20,7 +20,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 import type { PageId } from '@/pages'
 
 type HomePageProps = {
@@ -70,6 +72,24 @@ const shortcuts: {
   },
 ]
 
+// Marker colour for each evidence stream (see --stream-* in index.css).
+const streamDot: Record<string, string> = {
+  A: 'bg-stream-text',
+  B: 'bg-stream-timing',
+  C: 'bg-stream-structure',
+}
+
+// Icon chip colour for the shortcut cards.
+const shortcutChip: Record<PageId, string> = {
+  home: 'bg-primary/10 text-primary',
+  queue: 'bg-stream-ranking/10 text-stream-ranking',
+  timing: 'bg-stream-timing/15 text-stream-timing',
+  exposure: 'bg-stream-structure/10 text-stream-structure',
+  sprint: 'bg-stream-ranking/10 text-stream-ranking',
+  analyse: 'bg-stream-text/10 text-stream-text',
+  scores: 'bg-primary/10 text-primary',
+}
+
 export function HomePage({ onNavigate }: HomePageProps) {
   const [ranking, setRanking] = useState<PlannerRanking | null>(null)
   const [error, setError] = useState(false)
@@ -90,11 +110,11 @@ export function HomePage({ onNavigate }: HomePageProps) {
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <section className="grid gap-6 py-2 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
         <div className="flex flex-col items-start gap-4">
-          <Badge variant="outline">
+          <Badge variant="secondary">
             <ShieldCheck data-icon="inline-start" />
             Evidence led vulnerability prioritization
           </Badge>
-          <h2 className="max-w-2xl text-3xl font-semibold tracking-tight text-balance md:text-4xl">
+          <h2 className="max-w-2xl text-4xl font-semibold tracking-tight text-balance md:text-5xl">
             Turn vulnerability signals into a patch plan.
           </h2>
           <p className="max-w-2xl text-lg text-pretty text-muted-foreground">
@@ -150,7 +170,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
               <CardDescription>{label}</CardDescription>
               <CardTitle>{title}</CardTitle>
               <CardAction>
-                <span className="grid size-8 place-items-center rounded-lg bg-muted text-muted-foreground">
+                <span className={cn('grid size-9 place-items-center rounded-lg', shortcutChip[page])}>
                   <Icon className="size-4" />
                 </span>
               </CardAction>
@@ -177,7 +197,10 @@ export function HomePage({ onNavigate }: HomePageProps) {
             <dl className="grid gap-x-6 gap-y-4 text-base sm:grid-cols-2">
               {signalDescriptions.map((signal) => (
                 <div key={signal.key} className="flex items-start gap-3">
-                  <Badge variant="secondary" className="mt-px w-12">{signal.key}</Badge>
+                  <Badge variant="secondary" className="mt-px w-16">
+                    <span className={cn('size-1.5 shrink-0 rounded-full', streamDot[signal.key] ?? 'bg-muted-foreground/60')} />
+                    {signal.key}
+                  </Badge>
                   <div className="flex flex-col gap-0.5">
                     <dt className="font-medium">{signal.title}</dt>
                     <dd className="text-muted-foreground">{signal.detail}</dd>
@@ -204,15 +227,23 @@ export function HomePage({ onNavigate }: HomePageProps) {
                         <span className="truncate font-mono font-medium">{item.cve_id}</span>
                         <span className="text-sm text-muted-foreground">Risk rank {item.model_rank}</span>
                       </div>
-                      <span className="font-medium tabular-nums">{item.risk_score.toFixed(3)}</span>
+                      <div className="flex w-28 shrink-0 flex-col items-end gap-1.5">
+                        <span className="font-medium tabular-nums">{item.risk_score.toFixed(3)}</span>
+                        <Progress value={item.risk_score * 100} aria-label={`Risk score ${item.risk_score.toFixed(3)}`} />
+                      </div>
                     </div>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="py-3 text-base text-muted-foreground">
-                {error ? 'Ranking feed unavailable.' : 'Loading current priorities…'}
-              </p>
+              <div className="flex flex-col items-center gap-3 py-8 text-center text-muted-foreground">
+                <span className="grid size-10 place-items-center rounded-full bg-muted">
+                  <Database className="size-5" />
+                </span>
+                <p className="text-base">
+                  {error ? 'Ranking feed unavailable.' : 'Loading current priorities…'}
+                </p>
+              </div>
             )}
           </CardContent>
           <CardFooter>

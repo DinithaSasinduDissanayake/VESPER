@@ -60,8 +60,8 @@ export function StructuralRelationshipGraph({ data }: { data: StructuralDetails 
           node.kind === 'summary' && 'border-dashed text-muted-foreground',
           active === node.id && !isCve && 'border-structural ring-1 ring-structural')}
         title={`${node.label} · ${context}`}>
-        <span className="flex min-w-0 items-center gap-2 text-xs font-semibold"><Icon className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate">{node.label}</span></span>
-        <span className={cn('mt-1 block truncate text-[10px]', isCve ? 'text-structural-node-foreground/80' : 'text-muted-foreground')}>{node.context}</span>
+        <span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><Icon className="size-4 shrink-0" aria-hidden="true" /><span className="truncate">{node.label}</span></span>
+        <span className={cn('mt-1 block truncate text-xs', isCve ? 'text-structural-node-foreground/80' : 'text-muted-foreground')}>{node.context}</span>
       </button>
     )
   }
@@ -69,12 +69,12 @@ export function StructuralRelationshipGraph({ data }: { data: StructuralDetails 
   return (
     <section className="min-w-0 overflow-hidden rounded-xl border" aria-labelledby={`${id}-title`}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
-        <div><h4 id={`${id}-title`} className="font-semibold">Observed relationship graph</h4><p className="mt-1 text-xs text-muted-foreground">Vendor → Product → CVE → CWE</p></div>
-        <span className="rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider">Local evidence preview</span>
+        <div><h4 id={`${id}-title`} className="font-semibold">Observed relationship graph</h4><p className="mt-1 text-sm text-muted-foreground">Vendor → Product → CVE → CWE</p></div>
+        <span className="rounded-full border px-2.5 py-1 text-xs font-medium uppercase tracking-wider">Local evidence preview</span>
       </div>
       <div className="bg-muted/20 p-3 sm:p-5">
         <div className="hidden xl:block">
-          <div className="grid grid-cols-4 text-center text-[10px] font-medium uppercase tracking-widest text-muted-foreground" aria-hidden="true"><span>Vendors</span><span>Products</span><span>Vulnerability</span><span>Weaknesses</span></div>
+          <div className="grid grid-cols-4 text-center text-xs font-medium uppercase tracking-widest text-muted-foreground" aria-hidden="true"><span>Vendors</span><span>Products</span><span>Vulnerability</span><span>Weaknesses</span></div>
           <svg viewBox={`0 0 948 ${height}`} className="block w-full overflow-visible" role="group" aria-label={`Recorded relationships for ${data.cveId}`}>
             <defs><marker id={`${id}-arrow`} markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 7 3.5 0 7" fill="currentColor" /></marker></defs>
             {edges.map((edge) => {
@@ -92,18 +92,18 @@ export function StructuralRelationshipGraph({ data }: { data: StructuralDetails 
           <div className="grid gap-3 sm:grid-cols-2">
             {preview.map((pair, i) => <div key={`${pair.vendor}:${pair.product}`} className="min-w-0 rounded-xl border border-dashed p-3"><div className="h-[70px]">{nodeButton(nodes.find((n) => n.id === `vendor-${vendors.indexOf(pair.vendor)}`)!)}</div><GraphArrow active={active} connected={[`vendor-${vendors.indexOf(pair.vendor)}`, `product-${i}`]} /><div className="h-[70px]">{nodeButton(nodes.find((n) => n.id === `product-${i}`)!)}</div></div>)}
           </div>
-          {products.values.length > 4 && <p className="py-2 text-center text-xs text-muted-foreground">+{products.values.length - 4} more products · full evidence below</p>}
+          {products.values.length > 4 && <p className="py-2 text-center text-sm text-muted-foreground">+{products.values.length - 4} more products · full evidence below</p>}
           {preview.length > 0 && <GraphArrow active={active} connected={['cve', ...preview.map((_, i) => `product-${i}`)]} />}
           <div className="mx-auto h-[86px] max-w-xs">{nodeButton(nodes.find((n) => n.id === 'cve')!)}</div>
           {weaknesses.values.length > 0 && <GraphArrow active={active} connected={['cve', ...weaknesses.values.slice(0, 4).map((_, i) => `cwe-${i}`)]} />}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{nodes.filter((n) => n.kind === 'cwe').map((node) => <div key={node.id} className="h-[70px] min-w-0">{nodeButton(node)}</div>)}</div>
-          {weaknesses.values.length > 4 && <p className="py-2 text-center text-xs text-muted-foreground">+{weaknesses.values.length - 4} more weaknesses · full evidence below</p>}
+          {weaknesses.values.length > 4 && <p className="py-2 text-center text-sm text-muted-foreground">+{weaknesses.values.length - 4} more weaknesses · full evidence below</p>}
         </div>
-        {(products.status !== 'supported' || weaknesses.status !== 'supported') && <p className="mt-3 rounded-lg border border-dashed bg-background p-3 text-xs text-muted-foreground">{products.status !== 'supported' && `Product evidence ${products.status.replaceAll('_', ' ')}. `}{weaknesses.status !== 'supported' && `Weakness evidence ${weaknesses.status.replaceAll('_', ' ')}. `}Missing evidence is not a confirmed empty relationship set.</p>}
+        {(products.status !== 'supported' || weaknesses.status !== 'supported') && <p className="mt-3 rounded-lg border border-dashed bg-background p-3 text-sm text-muted-foreground">{products.status !== 'supported' && `Product evidence ${products.status.replaceAll('_', ' ')}. `}{weaknesses.status !== 'supported' && `Weakness evidence ${weaknesses.status.replaceAll('_', ' ')}. `}Missing evidence is not a confirmed empty relationship set.</p>}
       </div>
       <div className="space-y-2 border-t px-5 py-4">
-        <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium"><span>{products.status === 'supported' ? `${products.values.length} affected-product relationships` : 'Product count unavailable'}</span><span>{weaknesses.status === 'supported' ? `${weaknesses.values.length} weakness relationships` : 'Weakness count unavailable'}</span><span>Degree {data.graphFeatures.degree ?? 'unavailable'}</span></p>
-        <p className="text-xs leading-relaxed text-muted-foreground">Edges represent recorded vendor, product and weakness relationships — not network attack paths. Preview shows up to four products and four weaknesses. Hover or focus a node to emphasize its connections.</p>
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium"><span>{products.status === 'supported' ? `${products.values.length} affected-product relationships` : 'Product count unavailable'}</span><span>{weaknesses.status === 'supported' ? `${weaknesses.values.length} weakness relationships` : 'Weakness count unavailable'}</span><span>Degree {data.graphFeatures.degree ?? 'unavailable'}</span></p>
+        <p className="text-sm leading-relaxed text-muted-foreground">Edges represent recorded vendor, product and weakness relationships — not network attack paths. Preview shows up to four products and four weaknesses. Hover or focus a node to emphasize its connections.</p>
       </div>
     </section>
   )

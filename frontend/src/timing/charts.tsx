@@ -4,7 +4,7 @@ import type { Band } from './types'
 
 const WIDTH = 480
 const HEIGHT = 220
-const PAD = { left: 64, right: 16, top: 12, bottom: 40 }
+const PAD = { left: 78, right: 16, top: 12, bottom: 40 }
 const PLOT_W = WIDTH - PAD.left - PAD.right
 const PLOT_H = HEIGHT - PAD.top - PAD.bottom
 
@@ -34,13 +34,13 @@ export function LineChart({ points, xLabel, yLabel, yDomain, formatY, title, zoo
 
   return (
     <figure className="flex flex-col gap-1">
-      {zoomNote && <p className="text-xs font-medium text-amber-700 dark:text-amber-400">{zoomNote}</p>}
+      {zoomNote && <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{zoomNote}</p>}
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={title} className="w-full max-w-xl">
         <title>{title}</title>
         {ticks(yMin, yMax, 5).map((value) => (
           <g key={`y${value}`}>
             <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y(value)} y2={y(value)} className="stroke-border" />
-            <text x={PAD.left - 6} y={y(value) + 4} textAnchor="end" className="fill-muted-foreground text-[10px]">
+            <text x={PAD.left - 6} y={y(value) + 4} textAnchor="end" className="fill-muted-foreground text-[12px]">
               {formatY(value)}
             </text>
           </g>
@@ -51,7 +51,7 @@ export function LineChart({ points, xLabel, yLabel, yDomain, formatY, title, zoo
             x={x(value)}
             y={HEIGHT - PAD.bottom + 16}
             textAnchor="middle"
-            className="fill-muted-foreground text-[10px]"
+            className="fill-muted-foreground text-[12px]"
           >
             {Math.round(value)}
           </text>
@@ -65,13 +65,13 @@ export function LineChart({ points, xLabel, yLabel, yDomain, formatY, title, zoo
           className="stroke-muted-foreground"
         />
         <path d={path} fill="none" strokeWidth={2} className="stroke-foreground" />
-        <text x={PAD.left + PLOT_W / 2} y={HEIGHT - 6} textAnchor="middle" className="fill-foreground text-[11px]">
+        <text x={PAD.left + PLOT_W / 2} y={HEIGHT - 6} textAnchor="middle" className="fill-foreground text-[13px]">
           {xLabel}
         </text>
         <text
           transform={`translate(14 ${PAD.top + PLOT_H / 2}) rotate(-90)`}
           textAnchor="middle"
-          className="fill-foreground text-[11px]"
+          className="fill-foreground text-[13px]"
         >
           {yLabel}
         </text>
@@ -102,11 +102,11 @@ export function BandsChart({ bands }: { bands: Band[] }) {
         const width = (value / max) * barW
         return (
           <g key={band.start_day} transform={`translate(0 ${i * rowH + 4})`}>
-            <text x={labelW - 8} y={rowH / 2 + 4} textAnchor="end" className="fill-foreground text-[11px]">
+            <text x={labelW - 8} y={rowH / 2 + 4} textAnchor="end" className="fill-foreground text-[13px]">
               {bandLabel(band)}
             </text>
             <rect x={labelW} y={4} width={Math.max(width, 1)} height={rowH - 10} className="fill-foreground/70" />
-            <text x={labelW + width + 6} y={rowH / 2 + 4} className="fill-muted-foreground text-[10px]">
+            <text x={labelW + width + 6} y={rowH / 2 + 4} className="fill-muted-foreground text-[12px]">
               {value.toFixed(value < 1 ? 2 : 1)}
             </text>
           </g>
