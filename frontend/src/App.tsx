@@ -1,7 +1,7 @@
 import { useEffect, useState, type ComponentType } from 'react'
-import { ShieldCheck } from 'lucide-react'
 import { AnalysePage } from '@/analyse/AnalysePage'
 import { warmUpTextModel } from '@/api/aText'
+import { PageErrorBoundary } from '@/components/PageErrorBoundary'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { mainNav, pages, type PageId } from '@/pages'
@@ -73,21 +73,32 @@ function App() {
   const [activeId, setActiveId] = useState<PageId>('home')
   const page = pages[activeId]
   const PageComponent = activeId === 'home' ? null : pageComponents[activeId]
+  // CVE to open when the queue is reached from the Home top list.
+  const [openCveId, setOpenCveId] = useState<string | null>(null)
   // Sidebar links and the logo all just switch the page.
-  const goTo = setActiveId
+  const goTo = (id: PageId) => {
+    setOpenCveId(null)
+    setActiveId(id)
+  }
+  const openCve = (cveId: string) => {
+    setOpenCveId(cveId)
+    setActiveId('queue')
+  }
   // Load the text model on the backend while the user is still on another page.
   useEffect(warmUpTextModel, [])
 
   return (
     <div className="flex min-h-svh flex-col bg-surface md:flex-row">
-      <aside className="flex w-full shrink-0 flex-col border-b bg-sidebar text-sidebar-foreground md:sticky md:top-0 md:h-svh md:w-64 md:border-r md:border-b-0">
+      {/* The wrapper stretches to the page height so the sidebar colour does not stop at the first screen. */}
+      <div className="w-full shrink-0 border-b bg-sidebar md:w-64 md:border-r md:border-b-0">
+      <aside className="flex w-full flex-col text-sidebar-foreground md:sticky md:top-0 md:h-svh">
         <button
           type="button"
           onClick={() => goTo('home')}
           className="flex items-center gap-3 px-4 py-5 text-left outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
         >
-          <span className="grid size-9 place-items-center rounded-xl bg-linear-135 from-primary to-stream-ranking text-primary-foreground shadow-sm ring-1 ring-primary/20">
-            <ShieldCheck className="size-5" />
+          <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-base font-bold text-primary-foreground">
+            V
           </span>
           <span className="flex flex-col">
             <span className="text-base font-semibold tracking-tight">VESPER</span>
@@ -101,33 +112,25 @@ function App() {
           ))}
         </nav>
 
-        <nav aria-label="Help" className="flex flex-col border-t p-3">
-          <NavItem
-            id="scores"
-            activeId={activeId}
-            onSelect={goTo}
-            className="text-muted-foreground"
-          />
-        </nav>
       </aside>
+      </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur sm:px-6">
-          {page.icon && (
-            <span className="grid size-8 place-items-center rounded-lg bg-accent text-accent-foreground">
-              <page.icon className="size-4" />
-            </span>
-          )}
           <h1 className="text-base font-semibold tracking-tight">{page.title}</h1>
         </header>
 
         {/* key resets the page's state (e.g. the open CVE) when the page changes. */}
         <main className="min-w-0 flex-1 p-4 text-base sm:p-6 lg:p-8">
-          {activeId === 'home' ? (
-            <HomePage key={activeId} onNavigate={goTo} />
-          ) : (
-            PageComponent && <PageComponent key={activeId} />
-          )}
+          <PageErrorBoundary key={activeId}>
+            {activeId === 'home' ? (
+              <HomePage key={activeId} onNavigate={goTo} onOpenCve={openCve} />
+            ) : activeId === 'queue' ? (
+              <QueuePage key={activeId} initialCveId={openCveId} />
+            ) : (
+              PageComponent && <PageComponent key={activeId} />
+            )}
+          </PageErrorBoundary>
         </main>
       </div>
     </div>

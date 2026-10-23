@@ -70,12 +70,15 @@ function downloadPlanCsv(plan: PlannerResponse) {
   )
 }
 
-function displayValue(value: number | null, digits = 3) {
-  return value === null ? '—' : value.toFixed(digits)
+function displayValue(value: number | null | undefined, digits = 3) {
+  return value == null ? '—' : value.toFixed(digits)
 }
 
-function planRow(item: PlannedCandidate): PlannerCandidate {
-  return item
+// The /knapsack response carries only the planning fields, so fill the signal
+// columns (score_a/b/c, CVSS, EPSS, ...) from the matching ranking row.
+function planRow(item: PlannedCandidate, rankingById: Map<string, PlannerCandidate>): PlannedCandidate {
+  const rankingRow = rankingById.get(item.cve_id)
+  return rankingRow ? { ...rankingRow, ...item } : item
 }
 
 export function SprintPlanPage() {
@@ -116,7 +119,8 @@ export function SprintPlanPage() {
 
   const sourceRows = useMemo(() => {
     if (!plan) return ranking?.vulnerabilities ?? []
-    return [...plan.scheduled, ...plan.deferred].map(planRow)
+    const rankingById = new Map((ranking?.vulnerabilities ?? []).map((row) => [row.cve_id, row]))
+    return [...plan.scheduled, ...plan.deferred].map((item) => planRow(item, rankingById))
   }, [plan, ranking])
   const filteredRows = useMemo(() => {
     const term = search.trim().toUpperCase()

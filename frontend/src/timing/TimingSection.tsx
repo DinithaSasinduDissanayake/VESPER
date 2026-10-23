@@ -1,8 +1,7 @@
 // Owner: S.S.H. Thennakoon — the Exploit timing card on the CVE detail view.
-// Real model output when the CVE is in the demo JSON, otherwise the sample card.
+// Real model output when the CVE is in the demo JSON. Otherwise nothing: the
+// ranking's Exploit timing (B) card above already shows the real B score.
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { findScore } from '@/queue/format'
-import { ScoreSection } from '@/queue/ScoreSection'
 import type { QueueItem } from '@/queue/types'
 import { REGENERATE_COMMAND, useTimingData } from './data'
 import { chanceText, day } from './format'
@@ -29,9 +28,7 @@ export function TimingSection({ item }: { item: QueueItem }) {
   const detail = state.status === 'ready' ? state.data.cves.current[item.vulnerability.cve_id] : undefined
 
   if (state.status === 'error') return <MissingDataCard message={state.message} />
-  if (!detail) {
-    return <ScoreSection title="Exploit timing · Sample data" score={findScore(item, 'b_survival')} />
-  }
+  if (!detail) return null
   return (
     <Card>
       <CardHeader>
