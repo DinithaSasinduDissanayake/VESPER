@@ -13,13 +13,13 @@ export function StructuralSummary({ data }: { data: StructuralDetails }) {
     { label: 'Status', value: available ? 'Available' : 'Unavailable', icon: CircleCheck, note: score.status.replaceAll('_', ' ') },
   ]
   return (
-    <div>
+    <div className="[&>p]:text-sm">
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map(({ label, value, icon: Icon, note }, i) => (
           <div key={label} className={`min-w-0 rounded-xl border p-4 ${i === 0 ? 'border-structural-border bg-structural-soft' : 'bg-muted/30'}`}>
-            <dt className="flex items-center gap-2 text-xs font-medium"><Icon className="size-3.5 shrink-0 text-structural" aria-hidden="true" />{label}</dt>
+            <dt className="flex items-center gap-2 text-sm font-medium"><Icon className="size-4 shrink-0 text-structural" aria-hidden="true" />{label}</dt>
             <dd className={`mt-3 break-words font-semibold tracking-tight tabular-nums ${i === 0 && available ? 'text-4xl text-structural' : 'text-2xl'}`}>{value}</dd>
-            <dd className="mt-1 text-xs text-muted-foreground">{note}</dd>
+            <dd className="mt-1 text-sm text-muted-foreground">{note}</dd>
           </div>
         ))}
       </dl>
