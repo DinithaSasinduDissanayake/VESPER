@@ -85,9 +85,10 @@ function RankingRows({ candidates, onSelect }: { candidates: PlannerCandidate[];
   )
 }
 
-export function QueuePage() {
+// initialCveId opens that CVE's detail straight away (used by the Home top list).
+export function QueuePage({ initialCveId = null }: { initialCveId?: string | null } = {}) {
   const [ranking, setRanking] = useState<PlannerRanking | null>(null)
-  const [selectedCveId, setSelectedCveId] = useState<string | null>(null)
+  const [selectedCveId, setSelectedCveId] = useState<string | null>(initialCveId)
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState<string | null>(null)
